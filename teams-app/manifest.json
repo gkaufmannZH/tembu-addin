@@ -1,0 +1,51 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "94a73c83-31d3-44ba-8467-9bb8408b616e",
+  "developer": {
+    "name": "Tembu",
+    "websiteUrl": "https://tembu.app",
+    "privacyUrl": "https://tembu.app",
+    "termsOfUseUrl": "https://tembu.app"
+  },
+  "name": {
+    "short": "Tembu",
+    "full": "Tembu Rumbles"
+  },
+  "description": {
+    "short": "Rumbles für Meeting-Teilnehmer",
+    "full": "Zeigt deine Tembu-Rumbles für jeden Teilnehmer während Teams-Meetings"
+  },
+  "icons": {
+    "color": "assets/icon-color.png",
+    "outline": "assets/icon-outline.png"
+  },
+  "accentColor": "#2d5a5a",
+  "staticTabs": [
+    {
+      "entityId": "tembu-rumbles",
+      "name": "Tembu",
+      "contentUrl": "https://gkaufmannzh.github.io/tembu.app/teams-app/meeting.html",
+      "websiteUrl": "https://gkaufmannzh.github.io/tembu.app/teams-app/meeting.html",
+      "scopes": ["personal"]
+    }
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://gkaufmannzh.github.io/tembu.app/teams-app/config.html",
+      "canUpdateConfiguration": false,
+      "scopes": ["groupChat"],
+      "context": [
+        "meetingSidePanel",
+        "meetingDetailsTab",
+        "meetingChatTab"
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": [
+    "gkaufmannzh.github.io",
+    "login.microsoftonline.com"
+  ]
+}

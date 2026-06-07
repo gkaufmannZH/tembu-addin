@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tembu Rumble</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fff;
+      color: #1a1a1a;
+      font-size: 14px;
+    }
+    .header {
+      background: #2d5a5a;
+      color: #fff;
+      padding: 14px 16px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-title { font-size: 16px; font-weight: 700; }
+    .header-sub { font-size: 11px; opacity: 0.75; margin-top: 1px; }
+
+    .pane { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    .field input, .field textarea {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 14px;
+      color: #1a1a1a;
+      background: #fafafa;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .field input:focus, .field textarea:focus { border-color: #2d5a5a; background: #fff; }
+    .field textarea { resize: vertical; min-height: 80px; }
+
+    .source-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f0f5f5;
+      border: 1px solid #c8dada;
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 12px;
+      color: #2d5a5a;
+    }
+    .source-badge .source-type { font-weight: 600; }
+    .source-badge .source-subject { opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .btn-save {
+      background: #2d5a5a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.15s;
+    }
+    .btn-save:hover { opacity: 0.88; }
+    .btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .status {
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .status.success { background: #e8f5e8; color: #2d6a2d; }
+    .status.error   { background: #fde8e8; color: #9b2020; }
+    .status.info    { background: #f0f5f5; color: #2d5a5a; }
+
+    .user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #888;
+    }
+    .btn-signout {
+      background: none; border: none; color: #2d5a5a;
+      font-size: 12px; cursor: pointer; text-decoration: underline;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="header-title">Tembu</div>
+      <div class="header-sub">Rumble erstellen</div>
+    </div>
+  </div>
+
+  <div class="pane">
+    <!-- Source context badge -->
+    <div class="source-badge hidden" id="sourceBadge">
+      <span class="source-type" id="sourceType"></span>
+      <span class="source-subject" id="sourceSubject"></span>
+    </div>
+
+    <!-- Not signed in -->
+    <div id="signInSection">
+      <div class="status info">Microsoft-Konto verbinden um Rumbles zu speichern.</div>
+      <br/>
+      <button class="btn-save" id="btnSignIn">Mit Microsoft anmelden</button>
+    </div>
+
+    <!-- Signed in: form -->
+    <div id="formSection" class="hidden">
+      <div class="user-row">
+        <span id="userLabel"></span>
+        <button class="btn-signout" id="btnSignOut">Abmelden</button>
+      </div>
+
+      <div class="field" style="margin-top:12px">
+        <label>Kontakt</label>
+        <input type="text" id="contactName" placeholder="Name des Kontakts" />
+      </div>
+
+      <div class="field">
+        <label>Rumble</label>
+        <textarea id="rumbleText" placeholder="Was möchtest du beim nächsten Treffen besprechen?"></textarea>
+      </div>
+
+      <button class="btn-save" id="btnSave">Rumble speichern</button>
+    </div>
+
+    <div class="status hidden" id="statusMsg"></div>
+  </div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>

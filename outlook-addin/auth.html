@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+</head>
+<body>
+<script>
+const CLIENT_ID = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
+const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu.app/outlook-addin/auth.html';
+const SCOPES = ['User.Read', 'Tasks.ReadWrite'];
+
+const msalInstance = new msal.PublicClientApplication({
+  auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
+  cache: { cacheLocation: 'localStorage' }
+});
+
+Office.initialize = async function() {
+  try {
+    // Handle redirect response first
+    const response = await msalInstance.handleRedirectPromise();
+    if (response && response.accessToken) {
+      Office.context.ui.messageParent(JSON.stringify({ success: true, token: response.accessToken, account: response.account }));
+      return;
+    }
+    // No redirect response — start login
+    await msalInstance.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+  } catch (e) {
+    Office.context.ui.messageParent(JSON.stringify({ success: false, error: e.message }));
+  }
+};
+</script>
+</body>
+</html>

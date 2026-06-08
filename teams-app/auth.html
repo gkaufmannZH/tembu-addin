@@ -2,70 +2,28 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>Tembu Anmeldung</title>
-  <script src="https://res.cdn.office.net/teams-js/2.19.0/js/MicrosoftTeams.min.js"></script>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-           display: flex; align-items: center; justify-content: center;
-           height: 100vh; margin: 0; background: #f5f5f5; color: #333; font-size: 14px; }
-    #status { text-align: center; padding: 20px; }
-  </style>
+  <title>Tembu Auth</title>
+  <script src="lib/msal-browser.min.js"></script>
 </head>
 <body>
-  <div id="status">Prüfe Anmeldung…</div>
 <script>
-const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
-const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
-const SCOPES       = 'User.Read Tasks.Read';
+// MSAL redirect handler for loginPopup() flow.
+// MSAL in the parent (meeting.html) opened this popup and monitors it.
+// handleRedirectPromise() processes the auth code and notifies the parent
+// automatically via window.opener.postMessage.
+const msalInstance = new msal.PublicClientApplication({
+  auth: {
+    clientId: '6a0f7ccb-afe3-4045-9b45-721d2046fafb',
+    authority: 'https://login.microsoftonline.com/common',
+    redirectUri: 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html',
+  },
+  cache: { cacheLocation: 'sessionStorage' },
+});
 
-function setStatus(msg) { document.getElementById('status').textContent = msg; }
-
-function notifySuccess(token) {
-  try { microsoftTeams.authentication.notifySuccess(token); } catch (_) {
-    if (window.opener) window.opener.postMessage({ type: 'auth-success', token }, '*');
-  }
-}
-
-function notifyFailure(msg) {
-  try { microsoftTeams.authentication.notifyFailure(msg); } catch (_) {
-    if (window.opener) window.opener.postMessage({ type: 'auth-failure', error: msg }, '*');
-  }
-}
-
-// Parse URL hash (implicit flow returns token in fragment)
-const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-const token = hash.get('access_token');
-const error = hash.get('error');
-const errorDesc = hash.get('error_description');
-
-if (error) {
-  setStatus('Fehler: ' + errorDesc);
-  notifyFailure(error + ': ' + errorDesc);
-} else if (token) {
-  setStatus('Angemeldet! Fenster wird geschlossen…');
-  // Send in raw Teams SDK v1 message format directly to Teams Desktop —
-  // bypasses ensureInitialized() check that blocks notifySuccess in v2
-  const teamsParent = window.opener || window.parent;
-  if (teamsParent && teamsParent !== window) {
-    const msg = { id: 1, func: 'authentication.authenticate.success', args: [token], timestamp: Date.now() };
-    teamsParent.postMessage(msg, '*');
-    teamsParent.postMessage(JSON.stringify(msg), '*'); // some Teams versions expect string
-  }
-  // Also try SDK path in case it works
-  try { microsoftTeams.authentication.notifySuccess(token); } catch (_) {}
-  setTimeout(() => window.close(), 500);
-} else {
-  // No token yet — redirect to Microsoft login
-  setStatus('Weiterleitung zu Microsoft…');
-  const url = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
-  url.searchParams.set('client_id', CLIENT_ID);
-  url.searchParams.set('response_type', 'token');
-  url.searchParams.set('redirect_uri', REDIRECT_URI);
-  url.searchParams.set('scope', SCOPES);
-  url.searchParams.set('response_mode', 'fragment');
-  url.searchParams.set('prompt', 'select_account');
-  window.location.href = url.toString();
-}
+(async () => {
+  if (msalInstance.initialize) await msalInstance.initialize();
+  await msalInstance.handleRedirectPromise();
+})().catch(() => {});
 </script>
 </body>
 </html>

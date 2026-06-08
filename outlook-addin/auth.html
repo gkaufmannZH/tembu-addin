@@ -2,24 +2,14 @@
 <html>
 <head>
   <meta charset="UTF-8" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="lib/msal-browser.min.js"></script>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-    .btn { background: #2d5a5a; color: #fff; border: none; border-radius: 8px; padding: 14px 28px; font-size: 16px; cursor: pointer; }
-    .btn:hover { opacity: 0.9; }
-    .err { color: #9b2020; margin-top: 12px; font-size: 13px; display: none; }
-  </style>
 </head>
 <body>
-<div id="wrap" style="text-align:center; display:none">
-  <button class="btn" id="btn">Mit Microsoft anmelden</button>
-  <div class="err" id="err"></div>
-</div>
-<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script>
 /* globals Office, msal */
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
-const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu.app/outlook-addin/auth.html';
+const REDIRECT_URI = 'https://tembu-app-l29s.vercel.app/docs/outlook-addin/auth.html';
 const SCOPES       = ['User.Read', 'Tasks.ReadWrite'];
 
 const msalInstance = new msal.PublicClientApplication({
@@ -27,37 +17,23 @@ const msalInstance = new msal.PublicClientApplication({
   cache: { cacheLocation: 'localStorage' },
 });
 
-// Detect if this is the MSAL popup redirect callback (has auth params in URL)
-const isRedirect = /[?&#](code|access_token|error)=/.test(window.location.href);
-
-if (isRedirect) {
-  // Popup context: MSAL processes the redirect and notifies the opener
-  (async () => {
+Office.initialize = async function () {
+  try {
     if (msalInstance.initialize) await msalInstance.initialize();
-    await msalInstance.handleRedirectPromise().catch(() => {});
-  })();
-} else {
-  // Dialog context: show login button, use Office.js to send token back
-  Office.initialize = async function () {
-    if (msalInstance.initialize) await msalInstance.initialize();
-    document.getElementById('wrap').style.display = 'block';
-
-    document.getElementById('btn').addEventListener('click', async () => {
-      try {
-        const result = await msalInstance.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
-        Office.context.ui.messageParent(JSON.stringify({
-          success: true,
-          token: result.accessToken,
-          account: { name: result.account.name, username: result.account.username },
-        }));
-      } catch (e) {
-        const err = document.getElementById('err');
-        err.textContent = 'Fehler: ' + (e.message || String(e));
-        err.style.display = 'block';
-      }
-    });
-  };
-}
+    const response = await msalInstance.handleRedirectPromise();
+    if (response && response.accessToken) {
+      Office.context.ui.messageParent(JSON.stringify({
+        success: true,
+        token: response.accessToken,
+        account: { name: response.account.name, username: response.account.username },
+      }));
+      return;
+    }
+    await msalInstance.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+  } catch (e) {
+    Office.context.ui.messageParent(JSON.stringify({ success: false, error: e.message }));
+  }
+};
 </script>
 </body>
 </html>

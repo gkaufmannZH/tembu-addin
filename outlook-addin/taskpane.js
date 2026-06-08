@@ -235,7 +235,6 @@ function wireEvents() {
 function runDiag() {
   const out = document.getElementById('diagOut');
   out.style.display = 'block';
-  out.textContent = 'Teste…';
 
   const d = Office.context.diagnostics || {};
   const info = [
@@ -243,21 +242,36 @@ function runDiag() {
     'Platform: ' + (d.platform || '?'),
     'Version: ' + (d.version || '?'),
     'DisplayLanguage: ' + (Office.context.displayLanguage || '?'),
-    '',
-    'Dialog-Test: ' + AUTH_URL,
   ].join('\n');
-  out.textContent = info + '\nÖffne Dialog…';
 
-  Office.context.ui.displayDialogAsync(
-    AUTH_URL,
-    { height: 1, width: 1, promptBeforeOpen: false },
-    (r) => {
-      if (r.status === Office.AsyncResultStatus.Failed) {
-        out.textContent = info + '\nDialog FEHLER: ' + r.error.message + ' (code ' + r.error.code + ')';
-      } else {
-        out.textContent = info + '\nDialog OK – AppDomains erkannt ✓';
-        r.value.close();
-      }
+  const results = [];
+  out.textContent = info + '\n\nTeste URLs…';
+
+  const tests = [
+    { label: 'github.io/auth.html', url: AUTH_URL },
+    { label: 'login.microsoft.com', url: 'https://login.microsoftonline.com/common' },
+  ];
+
+  let i = 0;
+  function next() {
+    if (i >= tests.length) {
+      out.textContent = info + '\n\n' + results.join('\n');
+      return;
     }
-  );
+    const t = tests[i++];
+    Office.context.ui.displayDialogAsync(
+      t.url,
+      { height: 1, width: 1, promptBeforeOpen: false },
+      (r) => {
+        if (r.status === Office.AsyncResultStatus.Failed) {
+          results.push(t.label + ': FEHLER code ' + r.error.code);
+        } else {
+          results.push(t.label + ': OK ✓');
+          r.value.close();
+        }
+        next();
+      }
+    );
+  }
+  next();
 }

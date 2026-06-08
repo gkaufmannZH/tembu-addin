@@ -6,36 +6,55 @@ const SCOPES     = ['User.Read', 'Tasks.Read'];
 const TEMBU_LIST = 'Tembu';
 
 let _token = null;
-let _allRumbles = []; // { contactName, text, createdAt, sourceUrl, sourceType }
+let _allRumbles = [];
+let _msalInstance = null;
 
-// ── MSAL ──────────────────────────────────────────────────────────────────
-const msalInstance = new msal.PublicClientApplication({
-  auth: {
-    clientId: CLIENT_ID,
-    authority: 'https://login.microsoftonline.com/common',
-    redirectUri: AUTH_URL,
-  },
-  cache: { cacheLocation: 'localStorage' },
-});
+// ── MSAL (lazy, so a CDN failure doesn't crash the whole script) ──────────
+function getMsal() {
+  if (_msalInstance) return _msalInstance;
+  if (typeof msal === 'undefined') throw new Error('MSAL CDN nicht geladen');
+  _msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: AUTH_URL,
+    },
+    cache: { cacheLocation: 'localStorage' },
+  });
+  return _msalInstance;
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────
 wireEvents();
 
-msalInstance.initialize().then(async () => {
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    try {
-      const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
-      _token = result.accessToken;
-      await loadRumbles();
-      showSignedIn();
-    } catch {}
-  }
-});
+try {
+  const inst = getMsal();
+  const initFn = inst.initialize ? inst.initialize.bind(inst) : () => Promise.resolve();
+  initFn().then(async () => {
+    const accounts = inst.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const result = await inst.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+        _token = result.accessToken;
+        await loadRumbles();
+        showSignedIn();
+      } catch (_) {}
+    }
+  }).catch(e => setStatus('Init-Fehler: ' + e.message));
+} catch (e) {
+  setStatus('Fehler: ' + e.message);
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 function signIn() {
-  document.getElementById('btnSignIn').textContent = 'Verbinden…';
+  const btn = document.getElementById('btnSignIn');
+  btn.textContent = 'Verbinden…';
+
+  if (typeof microsoftTeams === 'undefined') {
+    btn.textContent = 'Fehler: Teams SDK nicht geladen';
+    return;
+  }
+
   microsoftTeams.authentication.authenticate({
     url: AUTH_URL,
     width: 600,
@@ -44,7 +63,7 @@ function signIn() {
     _token = token;
     loadRumbles().then(showSignedIn);
   }).catch(err => {
-    document.getElementById('btnSignIn').textContent = 'Fehler: ' + (err?.message || String(err));
+    btn.textContent = 'Fehler: ' + (err?.message || String(err));
   });
 }
 
@@ -92,7 +111,6 @@ function renderRumbles(filter) {
   const query = (filter || '').toLowerCase().trim();
   const list = document.getElementById('rumbleList');
 
-  // Group by contactName
   const grouped = {};
   for (const r of _allRumbles) {
     if (query && !r.contactName.toLowerCase().includes(query) && !r.text.toLowerCase().includes(query)) continue;
@@ -143,6 +161,11 @@ function escapeHtml(str) {
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────
+function setStatus(msg) {
+  const el = document.querySelector('.status');
+  if (el) el.textContent = msg;
+}
+
 function showSignedIn() {
   document.getElementById('notSignedIn').classList.add('hidden');
   document.getElementById('signedIn').classList.remove('hidden');

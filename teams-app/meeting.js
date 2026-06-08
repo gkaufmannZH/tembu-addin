@@ -18,16 +18,19 @@ async function signIn() {
 
   let tokenReceived = false;
 
-  // Fallback: listen for direct postMessage from auth popup
-  const msgHandler = (event) => {
-    if (event.origin !== 'https://gkaufmannzh.github.io') return;
-    if (!event.data?.tembuToken) return;
-    tokenReceived = true;
-    window.removeEventListener('message', msgHandler);
-    _token = event.data.tembuToken;
-    loadRumbles().then(showSignedIn);
-  };
-  window.addEventListener('message', msgHandler);
+  // Poll localStorage for token written by auth.html popup
+  const pollInterval = setInterval(() => {
+    const pending = localStorage.getItem('tembu_pending_token');
+    const ts = parseInt(localStorage.getItem('tembu_pending_ts') || '0');
+    if (pending && (Date.now() - ts) < 60000) {
+      clearInterval(pollInterval);
+      localStorage.removeItem('tembu_pending_token');
+      localStorage.removeItem('tembu_pending_ts');
+      tokenReceived = true;
+      _token = pending;
+      loadRumbles().then(showSignedIn);
+    }
+  }, 500);
 
   try {
     if (typeof microsoftTeams === 'undefined') throw new Error('Teams SDK nicht geladen');
@@ -45,13 +48,12 @@ async function signIn() {
       height: 535,
     });
 
-    // Teams SDK notifySuccess worked
-    window.removeEventListener('message', msgHandler);
+    clearInterval(pollInterval);
     _token = token;
     await loadRumbles();
     showSignedIn();
   } catch (err) {
-    window.removeEventListener('message', msgHandler);
+    clearInterval(pollInterval);
     if (!tokenReceived) {
       btn.textContent = 'Fehler: ' + (err?.message || String(err));
     }

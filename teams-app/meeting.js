@@ -14,6 +14,20 @@ wireEvents();
 // ── Auth ──────────────────────────────────────────────────────────────────
 async function signIn() {
   const btn = document.getElementById('btnSignIn');
+  btn.textContent = 'Verbinden…';
+
+  let tokenReceived = false;
+
+  // Fallback: listen for direct postMessage from auth popup
+  const msgHandler = (event) => {
+    if (event.origin !== 'https://gkaufmannzh.github.io') return;
+    if (!event.data?.tembuToken) return;
+    tokenReceived = true;
+    window.removeEventListener('message', msgHandler);
+    _token = event.data.tembuToken;
+    loadRumbles().then(showSignedIn);
+  };
+  window.addEventListener('message', msgHandler);
 
   try {
     if (typeof microsoftTeams === 'undefined') throw new Error('Teams SDK nicht geladen');
@@ -31,11 +45,16 @@ async function signIn() {
       height: 535,
     });
 
+    // Teams SDK notifySuccess worked
+    window.removeEventListener('message', msgHandler);
     _token = token;
     await loadRumbles();
     showSignedIn();
   } catch (err) {
-    btn.textContent = 'Fehler: ' + (err?.message || String(err));
+    window.removeEventListener('message', msgHandler);
+    if (!tokenReceived) {
+      btn.textContent = 'Fehler: ' + (err?.message || String(err));
+    }
   }
 }
 

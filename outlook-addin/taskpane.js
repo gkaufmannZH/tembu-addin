@@ -254,10 +254,11 @@ function runDiag() {
   ];
   out.textContent = info + '\ntaskpane lädt von: ' + document.URL + '\n\nTeste URLs…';
 
+  const taskpaneUrl = document.URL;
   let i = 0;
   function next() {
     if (i >= tests.length) {
-      out.textContent = info + '\n\n' + results.join('\n');
+      out.textContent = info + '\ntaskpane von: ' + taskpaneUrl + '\n\n' + results.join('\n');
       return;
     }
     const t = tests[i++];

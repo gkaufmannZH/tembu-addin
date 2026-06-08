@@ -7,64 +7,36 @@ const TEMBU_LIST = 'Tembu';
 
 let _token = null;
 let _allRumbles = [];
-let _msalInstance = null;
 
-// ── MSAL (lazy, so a CDN failure doesn't crash the whole script) ──────────
-function getMsal() {
-  if (_msalInstance) return _msalInstance;
-  if (typeof msal === 'undefined') throw new Error('MSAL CDN nicht geladen');
-  _msalInstance = new msal.PublicClientApplication({
-    auth: {
-      clientId: CLIENT_ID,
-      authority: 'https://login.microsoftonline.com/common',
-      redirectUri: AUTH_URL,
-    },
-    cache: { cacheLocation: 'localStorage' },
-  });
-  return _msalInstance;
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────
+// ── Init: only wire UI, no CDN calls at load time ─────────────────────────
 wireEvents();
 
-try {
-  const inst = getMsal();
-  const initFn = inst.initialize ? inst.initialize.bind(inst) : () => Promise.resolve();
-  initFn().then(async () => {
-    const accounts = inst.getAllAccounts();
-    if (accounts.length > 0) {
-      try {
-        const result = await inst.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
-        _token = result.accessToken;
-        await loadRumbles();
-        showSignedIn();
-      } catch (_) {}
-    }
-  }).catch(e => setStatus('Init-Fehler: ' + e.message));
-} catch (e) {
-  setStatus('Fehler: ' + e.message);
-}
-
 // ── Auth ──────────────────────────────────────────────────────────────────
-function signIn() {
+async function signIn() {
   const btn = document.getElementById('btnSignIn');
-  btn.textContent = 'Verbinden…';
 
-  if (typeof microsoftTeams === 'undefined') {
-    btn.textContent = 'Fehler: Teams SDK nicht geladen';
-    return;
-  }
+  try {
+    if (typeof microsoftTeams === 'undefined') throw new Error('Teams SDK nicht geladen');
 
-  microsoftTeams.authentication.authenticate({
-    url: AUTH_URL,
-    width: 600,
-    height: 535,
-  }).then(token => {
+    btn.textContent = 'Teams init…';
+    await Promise.race([
+      microsoftTeams.app.initialize(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Teams init timeout (3s)')), 3000)),
+    ]);
+
+    btn.textContent = 'Anmelden…';
+    const token = await microsoftTeams.authentication.authenticate({
+      url: AUTH_URL,
+      width: 600,
+      height: 535,
+    });
+
     _token = token;
-    loadRumbles().then(showSignedIn);
-  }).catch(err => {
+    await loadRumbles();
+    showSignedIn();
+  } catch (err) {
     btn.textContent = 'Fehler: ' + (err?.message || String(err));
-  });
+  }
 }
 
 // ── Graph ─────────────────────────────────────────────────────────────────
@@ -161,11 +133,6 @@ function escapeHtml(str) {
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────
-function setStatus(msg) {
-  const el = document.querySelector('.status');
-  if (el) el.textContent = msg;
-}
-
 function showSignedIn() {
   document.getElementById('notSignedIn').classList.add('hidden');
   document.getElementById('signedIn').classList.remove('hidden');

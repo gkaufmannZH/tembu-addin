@@ -95,19 +95,35 @@ function loadOutlookContext() {
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────
-async function startSignIn() {
-  const btn = document.getElementById('btnSignIn');
-  btn.textContent = 'Verbinden…';
-  try {
-    const result = await msalInstance.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
-    _token = result.accessToken;
-    _account = result.account;
-    showForm();
-    clearStatus();
-  } catch (err) {
-    btn.textContent = 'Mit Microsoft anmelden';
-    showStatus('Anmeldung fehlgeschlagen: ' + (err?.message || String(err)), 'error');
-  }
+function startSignIn() {
+  Office.context.ui.displayDialogAsync(
+    AUTH_URL,
+    { height: 60, width: 35, promptBeforeOpen: false },
+    (asyncResult) => {
+      if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+        showStatus('Dialog-Fehler: ' + (asyncResult.error?.message || asyncResult.error?.code || 'unbekannt'), 'error');
+        return;
+      }
+      const dialog = asyncResult.value;
+      dialog.addEventHandler(Office.EventType.DialogMessageReceived, (args) => {
+        dialog.close();
+        try {
+          const msg = JSON.parse(args.message);
+          if (msg.success && msg.token) {
+            _token = msg.token;
+            _account = msg.account;
+            showForm();
+            clearStatus();
+          } else {
+            showStatus(msg.error || 'Anmeldung fehlgeschlagen.', 'error');
+          }
+        } catch {
+          showStatus('Unbekannter Fehler.', 'error');
+        }
+      });
+      dialog.addEventHandler(Office.EventType.DialogEventReceived, () => dialog.close());
+    }
+  );
 }
 
 function signOut() {

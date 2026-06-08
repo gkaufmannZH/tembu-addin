@@ -101,7 +101,7 @@ function startSignIn() {
     { height: 60, width: 35, promptBeforeOpen: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-        showStatus('Anmeldung fehlgeschlagen.', 'error');
+        showStatus('Dialog-Fehler: ' + (asyncResult.error?.message || asyncResult.error?.code || 'unbekannt'), 'error');
         return;
       }
       const dialog = asyncResult.value;

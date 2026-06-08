@@ -46,11 +46,11 @@ function signIn() {
     url: AUTH_URL,
     width: 600,
     height: 535,
-    successCallback: (token) => {
-      _token = token;
-      loadRumbles().then(showSignedIn);
-    },
-    failureCallback: () => {},
+  }).then(token => {
+    _token = token;
+    loadRumbles().then(showSignedIn);
+  }).catch(err => {
+    console.error('Teams auth failed:', err);
   });
 }
 

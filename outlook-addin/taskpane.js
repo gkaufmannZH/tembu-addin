@@ -250,7 +250,9 @@ function runDiag() {
   const tests = [
     { label: 'github.io/auth.html', url: AUTH_URL },
     { label: 'login.microsoft.com', url: 'https://login.microsoftonline.com/common' },
+    { label: 'taskpane URL', url: document.URL },
   ];
+  out.textContent = info + '\ntaskpane lädt von: ' + document.URL + '\n\nTeste URLs…';
 
   let i = 0;
   function next() {

@@ -11,12 +11,12 @@
   <DefaultLocale>de-DE</DefaultLocale>
   <DisplayName DefaultValue="Tembu" />
   <Description DefaultValue="Rumble aus Outlook erstellen" />
-  <IconUrl DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/assets/icon.png" />
-  <HighResolutionIconUrl DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/assets/icon.png" />
+  <IconUrl DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/assets/icon.png" />
+  <HighResolutionIconUrl DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/assets/icon.png" />
   <SupportUrl DefaultValue="https://tembu.app" />
 
   <AppDomains>
-    <AppDomain>https://gkaufmannzh.github.io</AppDomain>
+    <AppDomain>https://tembu-app-l29s.vercel.app</AppDomain>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
   </AppDomains>
 
@@ -32,7 +32,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html" />
+        <SourceLocation DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/taskpane.html" />
         <RequestedHeight>500</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -137,13 +137,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/assets/icon.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/assets/icon.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.16" DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/assets/icon.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html" />
+        <bt:Url id="Commands.Url" DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/commands.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://tembu-app-l29s.vercel.app/outlook-addin/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Tembu" />

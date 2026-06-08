@@ -19,9 +19,9 @@ const msalInstance = new msal.PublicClientApplication({
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
-microsoftTeams.app.initialize().then(async () => {
-  await msalInstance.initialize();
+wireEvents();
 
+msalInstance.initialize().then(async () => {
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length > 0) {
     try {
@@ -29,15 +29,8 @@ microsoftTeams.app.initialize().then(async () => {
       _token = result.accessToken;
       await loadRumbles();
       showSignedIn();
-      return;
     } catch {}
   }
-  showNotSignedIn();
-  wireEvents();
-}).catch(() => {
-  // Not running in Teams — still render for browser testing
-  document.getElementById('notSignedIn').classList.remove('hidden');
-  wireEvents();
 });
 
 // ── Auth ──────────────────────────────────────────────────────────────────

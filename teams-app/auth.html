@@ -43,7 +43,13 @@ if (error) {
   notifyFailure(error + ': ' + errorDesc);
 } else if (token) {
   setStatus('Angemeldet! Fenster wird geschlossen…');
-  notifySuccess(token);
+  // app.initialize() sets up the postMessage channel to the parent Teams window
+  Promise.race([
+    microsoftTeams.app.initialize(),
+    new Promise(r => setTimeout(r, 2000)),
+  ]).finally(() => {
+    microsoftTeams.authentication.notifySuccess(token);
+  });
 } else {
   // No token yet — redirect to Microsoft login
   setStatus('Weiterleitung zu Microsoft…');

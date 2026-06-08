@@ -26,14 +26,14 @@
     {
       "entityId": "tembu-rumbles",
       "name": "Tembu",
-      "contentUrl": "https://tembu-app-l29s.vercel.app/teams-app/meeting.html",
-      "websiteUrl": "https://tembu-app-l29s.vercel.app/teams-app/meeting.html",
+      "contentUrl": "https://gkaufmannzh.github.io/tembu.app/teams-app/meeting.html",
+      "websiteUrl": "https://gkaufmannzh.github.io/tembu.app/teams-app/meeting.html",
       "scopes": ["personal"]
     }
   ],
   "configurableTabs": [
     {
-      "configurationUrl": "https://tembu-app-l29s.vercel.app/teams-app/config.html",
+      "configurationUrl": "https://gkaufmannzh.github.io/tembu.app/teams-app/config.html",
       "canUpdateConfiguration": false,
       "scopes": ["groupChat"],
       "context": [

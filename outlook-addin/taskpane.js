@@ -229,4 +229,35 @@ function wireEvents() {
   document.getElementById('btnSignIn').addEventListener('click', startSignIn);
   document.getElementById('btnSignOut').addEventListener('click', signOut);
   document.getElementById('btnSave').addEventListener('click', handleSave);
+  document.getElementById('btnDiag').addEventListener('click', runDiag);
+}
+
+function runDiag() {
+  const out = document.getElementById('diagOut');
+  out.style.display = 'block';
+  out.textContent = 'Teste…';
+
+  const d = Office.context.diagnostics || {};
+  const info = [
+    'Host: ' + (d.host || '?'),
+    'Platform: ' + (d.platform || '?'),
+    'Version: ' + (d.version || '?'),
+    'DisplayLanguage: ' + (Office.context.displayLanguage || '?'),
+    '',
+    'Dialog-Test: ' + AUTH_URL,
+  ].join('\n');
+  out.textContent = info + '\nÖffne Dialog…';
+
+  Office.context.ui.displayDialogAsync(
+    AUTH_URL,
+    { height: 1, width: 1, promptBeforeOpen: false },
+    (r) => {
+      if (r.status === Office.AsyncResultStatus.Failed) {
+        out.textContent = info + '\nDialog FEHLER: ' + r.error.message + ' (code ' + r.error.code + ')';
+      } else {
+        out.textContent = info + '\nDialog OK – AppDomains erkannt ✓';
+        r.value.close();
+      }
+    }
+  );
 }

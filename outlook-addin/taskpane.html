@@ -108,7 +108,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v4</span></div>
+      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v5</span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
@@ -148,6 +148,12 @@
     </div>
 
     <div class="status hidden" id="statusMsg"></div>
+
+    <!-- Diagnose -->
+    <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px">
+      <button id="btnDiag" style="background:none;border:1px solid #ccc;border-radius:6px;padding:5px 10px;font-size:11px;color:#666;cursor:pointer;width:100%">Diagnose</button>
+      <pre id="diagOut" style="font-size:10px;color:#444;background:#f8f8f8;border-radius:6px;padding:8px;margin-top:6px;white-space:pre-wrap;display:none"></pre>
+    </div>
   </div>
 
   <script src="taskpane.js"></script>

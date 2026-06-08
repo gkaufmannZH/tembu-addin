@@ -43,16 +43,17 @@ if (error) {
   notifyFailure(error + ': ' + errorDesc);
 } else if (token) {
   setStatus('Angemeldet! Fenster wird geschlossen…');
-  // initialize() (v1-style) sets runtime.isInitialized synchronously so
-  // notifySuccess can send the message without waiting for async handshake
-  microsoftTeams.initialize();
-  setTimeout(() => {
-    try {
-      microsoftTeams.authentication.notifySuccess(token);
-    } catch (e) {
-      setStatus('notify Fehler: ' + e.message);
-    }
-  }, 200);
+  // Send in raw Teams SDK v1 message format directly to Teams Desktop —
+  // bypasses ensureInitialized() check that blocks notifySuccess in v2
+  const teamsParent = window.opener || window.parent;
+  if (teamsParent && teamsParent !== window) {
+    const msg = { id: 1, func: 'authentication.authenticate.success', args: [token], timestamp: Date.now() };
+    teamsParent.postMessage(msg, '*');
+    teamsParent.postMessage(JSON.stringify(msg), '*'); // some Teams versions expect string
+  }
+  // Also try SDK path in case it works
+  try { microsoftTeams.authentication.notifySuccess(token); } catch (_) {}
+  setTimeout(() => window.close(), 500);
 } else {
   // No token yet — redirect to Microsoft login
   setStatus('Weiterleitung zu Microsoft…');

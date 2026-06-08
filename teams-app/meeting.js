@@ -11,6 +11,16 @@ let _allRumbles = [];
 // ── Init: only wire UI, no CDN calls at load time ─────────────────────────
 wireEvents();
 
+// Listen for raw Teams SDK v1-format auth success forwarded by Teams Desktop
+window.addEventListener('message', (event) => {
+  const d = event.data;
+  const parsed = (typeof d === 'string') ? (() => { try { return JSON.parse(d); } catch { return null; } })() : d;
+  if (parsed?.func === 'authentication.authenticate.success' && parsed?.args?.[0]) {
+    _token = parsed.args[0];
+    loadRumbles().then(showSignedIn);
+  }
+});
+
 // ── Auth ──────────────────────────────────────────────────────────────────
 async function signIn() {
   const btn = document.getElementById('btnSignIn');

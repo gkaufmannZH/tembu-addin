@@ -42,6 +42,7 @@ microsoftTeams.app.initialize().then(async () => {
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 function signIn() {
+  document.getElementById('btnSignIn').textContent = 'Verbinden…';
   microsoftTeams.authentication.authenticate({
     url: AUTH_URL,
     width: 600,
@@ -50,7 +51,7 @@ function signIn() {
     _token = token;
     loadRumbles().then(showSignedIn);
   }).catch(err => {
-    console.error('Teams auth failed:', err);
+    document.getElementById('btnSignIn').textContent = 'Fehler: ' + (err?.message || String(err));
   });
 }
 

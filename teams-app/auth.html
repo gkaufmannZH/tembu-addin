@@ -1,32 +1,55 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
+  <title>Tembu Anmeldung</title>
   <script src="https://res.cdn.office.net/teams-js/2.19.0/js/MicrosoftTeams.min.js"></script>
   <script src="https://alcdn.msauth.net/browser/2.39.0/js/msal-browser.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           display: flex; align-items: center; justify-content: center;
+           height: 100vh; margin: 0; background: #f5f5f5; color: #333; font-size: 14px; }
+    #status { text-align: center; padding: 20px; }
+  </style>
 </head>
 <body>
+  <div id="status">Initialisiere…</div>
 <script>
-const CLIENT_ID = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
+const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
-const SCOPES = ['User.Read', 'Tasks.Read'];
+const SCOPES       = ['User.Read', 'Tasks.Read'];
 
-const msalInstance = new msal.PublicClientApplication({
-  auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
-  cache: { cacheLocation: 'localStorage' },
-});
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
 
-microsoftTeams.app.initialize().then(async () => {
-  try {
-    const response = await msalInstance.handleRedirectPromise();
-    if (response?.accessToken) {
-      microsoftTeams.authentication.notifySuccess(response.accessToken);
-      return;
-    }
-    await msalInstance.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
-  } catch (e) {
-    microsoftTeams.authentication.notifyFailure(e.message);
+async function main() {
+  const msalInstance = new msal.PublicClientApplication({
+    auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
+    cache: { cacheLocation: 'localStorage' },
+  });
+
+  if (typeof msalInstance.initialize === 'function') {
+    setStatus('MSAL init…');
+    await msalInstance.initialize();
   }
+
+  setStatus('Prüfe Auth-Antwort…');
+  const response = await msalInstance.handleRedirectPromise();
+
+  if (response?.accessToken) {
+    setStatus('Angemeldet! Fenster wird geschlossen…');
+    microsoftTeams.authentication.notifySuccess(response.accessToken);
+    return;
+  }
+
+  setStatus('Weiterleitung zu Microsoft…');
+  await msalInstance.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+}
+
+main().catch(e => {
+  setStatus('Fehler: ' + (e?.message || String(e)));
+  try { microsoftTeams.authentication.notifyFailure(e?.message || String(e)); } catch (_) {}
 });
 </script>
 </body>

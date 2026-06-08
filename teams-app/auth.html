@@ -43,12 +43,16 @@ if (error) {
   notifyFailure(error + ': ' + errorDesc);
 } else if (token) {
   setStatus('Angemeldet! Fenster wird geschlossen…');
-  // Store token in localStorage — meeting.html polls for it
-  localStorage.setItem('tembu_pending_token', token);
-  localStorage.setItem('tembu_pending_ts', String(Date.now()));
-  // Also try Teams SDK path
-  try { microsoftTeams.authentication.notifySuccess(token); } catch (_) {}
-  setTimeout(() => window.close(), 300);
+  // initialize() (v1-style) sets runtime.isInitialized synchronously so
+  // notifySuccess can send the message without waiting for async handshake
+  microsoftTeams.initialize();
+  setTimeout(() => {
+    try {
+      microsoftTeams.authentication.notifySuccess(token);
+    } catch (e) {
+      setStatus('notify Fehler: ' + e.message);
+    }
+  }, 200);
 } else {
   // No token yet — redirect to Microsoft login
   setStatus('Weiterleitung zu Microsoft…');

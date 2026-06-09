@@ -1,32 +1,25 @@
-/* globals msal */
+/* globals msal, microsoftTeams */
 
 const CLIENT_ID   = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
-const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
+const AUTH_URL    = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
 const SCOPES      = ['User.Read', 'Tasks.Read'];
 const TEMBU_LIST  = 'Tembu';
 
 let _token = null;
 let _allRumbles = [];
 let _msal = null;
-
-async function getMsal() {
-  if (_msal) return _msal;
-  _msal = new msal.PublicClientApplication({
-    auth: {
-      clientId: CLIENT_ID,
-      authority: 'https://login.microsoftonline.com/common',
-      redirectUri: REDIRECT_URI,
-    },
-    cache: { cacheLocation: 'sessionStorage' },
-  });
-  if (_msal.initialize) await _msal.initialize();
-  return _msal;
-}
+let _teamsReady = false;
 
 // ── Init ──────────────────────────────────────────────────────────────────
 wireEvents();
 
 (async () => {
+  try {
+    await microsoftTeams.app.initialize();
+    _teamsReady = true;
+  } catch {}
+
+  // Try silent token on startup
   try {
     const inst = await getMsal();
     const accounts = inst.getAllAccounts();
@@ -36,21 +29,52 @@ wireEvents();
       await loadRumbles();
       showSignedIn();
     }
-  } catch (_) {}
+  } catch {}
 })();
+
+// ── MSAL (silent refresh only) ────────────────────────────────────────────
+async function getMsal() {
+  if (_msal) return _msal;
+  _msal = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: AUTH_URL,
+    },
+    cache: { cacheLocation: 'sessionStorage' },
+  });
+  if (_msal.initialize) await _msal.initialize();
+  return _msal;
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 async function signIn() {
   const btn = document.getElementById('btnSignIn');
+  const status = document.querySelector('.status');
   btn.textContent = 'Verbinden…';
+  btn.disabled = true;
+  if (status) status.textContent = '';
+
   try {
-    const inst = await getMsal();
-    const result = await inst.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
-    _token = result.accessToken;
+    if (_teamsReady) {
+      // Teams-managed auth dialog — no window.open() needed
+      _token = await microsoftTeams.authentication.authenticate({
+        url: AUTH_URL,
+        width: 600,
+        height: 535,
+      });
+    } else {
+      // Fallback for browser testing
+      const inst = await getMsal();
+      const result = await inst.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
+      _token = result.accessToken;
+    }
     await loadRumbles();
     showSignedIn();
   } catch (err) {
-    btn.textContent = 'Fehler: ' + (err?.message || String(err));
+    btn.textContent = 'Mit Microsoft anmelden';
+    btn.disabled = false;
+    if (status) status.textContent = 'Fehler: ' + (err?.message || String(err));
   }
 }
 

@@ -3,27 +3,50 @@
 <head>
   <meta charset="UTF-8" />
   <title>Tembu Auth</title>
+  <script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
   <script src="lib/msal-browser.min.js"></script>
 </head>
 <body>
 <script>
-// MSAL redirect handler for loginPopup() flow.
-// MSAL in the parent (meeting.html) opened this popup and monitors it.
-// handleRedirectPromise() processes the auth code and notifies the parent
-// automatically via window.opener.postMessage.
-const msalInstance = new msal.PublicClientApplication({
-  auth: {
-    clientId: '6a0f7ccb-afe3-4045-9b45-721d2046fafb',
-    authority: 'https://login.microsoftonline.com/common',
-    redirectUri: 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html',
-  },
-  cache: { cacheLocation: 'sessionStorage' },
-});
+const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
+const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
+const SCOPES       = ['User.Read', 'Tasks.Read'];
 
 (async () => {
+  await microsoftTeams.app.initialize();
+
+  const msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: REDIRECT_URI,
+    },
+    cache: { cacheLocation: 'sessionStorage' },
+  });
   if (msalInstance.initialize) await msalInstance.initialize();
-  await msalInstance.handleRedirectPromise();
-})().catch(() => {});
+
+  // After Microsoft redirects back here with auth code
+  const response = await msalInstance.handleRedirectPromise();
+  if (response?.accessToken) {
+    microsoftTeams.authentication.notifySuccess(response.accessToken);
+    return;
+  }
+
+  // Try silent with existing account
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+      microsoftTeams.authentication.notifySuccess(result.accessToken);
+      return;
+    } catch {}
+  }
+
+  // Start interactive login (redirect-based, no popup)
+  await msalInstance.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+})().catch(err => {
+  microsoftTeams.authentication.notifyFailure(err.message || String(err));
+});
 </script>
 </body>
 </html>

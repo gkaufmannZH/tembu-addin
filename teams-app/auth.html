@@ -21,7 +21,7 @@ const SCOPES       = ['User.Read', 'Tasks.Read'];
       authority: 'https://login.microsoftonline.com/common',
       redirectUri: REDIRECT_URI,
     },
-    cache: { cacheLocation: 'sessionStorage' },
+    cache: { cacheLocation: 'localStorage' },
   });
   if (msalInstance.initialize) await msalInstance.initialize();
 

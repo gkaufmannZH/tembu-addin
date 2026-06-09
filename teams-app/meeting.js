@@ -41,7 +41,7 @@ async function getMsal() {
       authority: 'https://login.microsoftonline.com/common',
       redirectUri: AUTH_URL,
     },
-    cache: { cacheLocation: 'sessionStorage' },
+    cache: { cacheLocation: 'localStorage' },
   });
   if (_msal.initialize) await _msal.initialize();
   return _msal;

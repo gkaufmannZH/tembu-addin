@@ -2,7 +2,7 @@
 
 const CLIENT_ID   = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const AUTH_URL    = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
-const SCOPES      = ['User.Read', 'Tasks.Read', 'Chat.ReadBasic'];
+const SCOPES      = ['User.Read', 'Tasks.ReadWrite', 'Chat.ReadBasic'];
 const TEMBU_LIST  = 'Tembu';
 
 let _token = null;
@@ -10,6 +10,7 @@ let _allRumbles = [];
 let _msal = null;
 let _teamsReady = false;
 let _chatMemberNames = []; // display names of participants in current chat/meeting
+let _notesOpen = false;
 
 // ── Init ──────────────────────────────────────────────────────────────────
 wireEvents();
@@ -58,14 +59,12 @@ async function signIn() {
 
   try {
     if (_teamsReady) {
-      // Teams-managed auth dialog — no window.open() needed
       _token = await microsoftTeams.authentication.authenticate({
         url: AUTH_URL,
         width: 600,
         height: 535,
       });
     } else {
-      // Fallback for browser testing
       const inst = await getMsal();
       const result = await inst.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
       _token = result.accessToken;
@@ -88,6 +87,16 @@ async function graphGet(path) {
   return res.json();
 }
 
+async function graphPost(path, body) {
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Graph POST ${res.status}`);
+  return res.json();
+}
+
 function parseBody(text) {
   const r = {};
   for (const line of (text || '').split('\n')) {
@@ -95,6 +104,14 @@ function parseBody(text) {
     if (i > 0) r[line.slice(0, i).trim()] = line.slice(i + 1).trim();
   }
   return r;
+}
+
+async function getOrCreateTembuList() {
+  const lists = await graphGet('/me/todo/lists');
+  const existing = lists.value?.find(l => l.displayName === TEMBU_LIST);
+  if (existing) return existing.id;
+  const created = await graphPost('/me/todo/lists', { displayName: TEMBU_LIST });
+  return created.id;
 }
 
 async function loadRumbles() {
@@ -191,6 +208,73 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Meeting-Notizen (Point 5) ─────────────────────────────────────────────
+function toggleNotes() {
+  _notesOpen = !_notesOpen;
+  const panel = document.getElementById('notesPanel');
+  const btn = document.getElementById('btnNotes');
+  const searchWrap = document.getElementById('searchWrap');
+  const rumbleList = document.getElementById('rumbleList');
+
+  if (_notesOpen) {
+    panel.classList.remove('hidden');
+    searchWrap.classList.add('hidden');
+    rumbleList.classList.add('hidden');
+    btn.textContent = '✕ Schliessen';
+    const hint = document.getElementById('notesParticipantHint');
+    if (hint) {
+      hint.textContent = _chatMemberNames.length > 0
+        ? `${_chatMemberNames.length} Teilnehmer erkannt`
+        : 'Keine Teilnehmer erkannt — Notiz als allgemeiner Rumble';
+    }
+  } else {
+    panel.classList.add('hidden');
+    searchWrap.classList.remove('hidden');
+    rumbleList.classList.remove('hidden');
+    btn.textContent = '📝 Notizen';
+    document.getElementById('notesStatus').textContent = '';
+  }
+}
+
+async function createRumblesFromNotes() {
+  const notes = document.getElementById('notesInput')?.value?.trim();
+  if (!notes) {
+    document.getElementById('notesStatus').textContent = 'Bitte Notizen eingeben.';
+    return;
+  }
+
+  const participants = _chatMemberNames.length > 0 ? _chatMemberNames : ['Allgemein'];
+  const btn = document.getElementById('btnCreateRumbles');
+  btn.disabled = true;
+  btn.textContent = 'Erstelle…';
+  document.getElementById('notesStatus').textContent = '';
+
+  try {
+    const listId = await getOrCreateTembuList();
+    for (const name of participants) {
+      await graphPost(`/me/todo/lists/${listId}/tasks`, {
+        title: `Tembu: ${name}`,
+        body: {
+          content: `TEXT:${notes}\nCONTACT:${name}\nCREATED:${new Date().toISOString()}`,
+          contentType: 'text',
+        },
+        importance: 'normal',
+      });
+    }
+    document.getElementById('notesStatus').textContent =
+      `${participants.length} Rumble${participants.length !== 1 ? 's' : ''} erstellt ✓`;
+    document.getElementById('notesInput').value = '';
+    // Reload and re-render with fresh data
+    await loadRumbles();
+    toggleNotes();
+    renderRumbles('');
+  } catch (e) {
+    document.getElementById('notesStatus').textContent = 'Fehler: ' + (e.message || String(e));
+    btn.disabled = false;
+    btn.textContent = 'Rumbles erstellen';
+  }
+}
+
 // ── UI helpers ────────────────────────────────────────────────────────────
 function showSignedIn() {
   document.getElementById('notSignedIn').classList.add('hidden');
@@ -201,4 +285,6 @@ function showSignedIn() {
 function wireEvents() {
   document.getElementById('btnSignIn')?.addEventListener('click', signIn);
   document.getElementById('searchInput')?.addEventListener('input', e => renderRumbles(e.target.value));
+  document.getElementById('btnNotes')?.addEventListener('click', toggleNotes);
+  document.getElementById('btnCreateRumbles')?.addEventListener('click', createRumblesFromNotes);
 }

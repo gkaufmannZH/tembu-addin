@@ -11,6 +11,7 @@ let _account = null;
 let _sourceUrl = null;
 let _itemType = null;
 let _contactEmail = null;
+let _appointmentAttendeeNames = [];
 
 // ── MSAL instance (silent refresh only — auth happens via dialog) ──────────
 const msalInstance = new msal.PublicClientApplication({
@@ -72,8 +73,14 @@ function loadOutlookContext() {
   function setSubject(el) {
     if (typeof item.subject === 'string') {
       el.textContent = item.subject;
+      setRumbleSuggestion(item.subject);
     } else if (item.subject?.getAsync) {
-      item.subject.getAsync(r => { if (r.status === Office.AsyncResultStatus.Succeeded) el.textContent = r.value || ''; });
+      item.subject.getAsync(r => {
+        if (r.status === Office.AsyncResultStatus.Succeeded) {
+          el.textContent = r.value || '';
+          setRumbleSuggestion(r.value || '');
+        }
+      });
     }
   }
 
@@ -110,6 +117,7 @@ function loadOutlookContext() {
     // Read mode: attendees are plain arrays; compose mode: Office.Recipients objects with getAsync()
     if (Array.isArray(item.requiredAttendees)) {
       const all = [...(item.requiredAttendees || []), ...(item.optionalAttendees || [])];
+      _appointmentAttendeeNames = all.map(a => a.displayName).filter(Boolean);
       const first = all.find(a => a.displayName);
       if (first) {
         contactInput.value = first.displayName;
@@ -119,6 +127,7 @@ function loadOutlookContext() {
     } else if (item.requiredAttendees?.getAsync) {
       item.requiredAttendees.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
+          _appointmentAttendeeNames = (r.value || []).map(a => a.displayName).filter(Boolean);
           const first = (r.value || []).find(a => a.displayName);
           if (first) {
             contactInput.value = first.displayName;
@@ -232,6 +241,7 @@ async function saveRumble(contactName, contactPhone, rumbleText) {
     `SOURCE_TYPE:${_itemType === Office.MailboxEnums.ItemType.Appointment ? 'appointment' : 'message'}`,
   ];
   if (contactPhone) bodyLines.push(`CONTACT_PHONE:${contactPhone}`);
+  if (_contactEmail) bodyLines.push(`CONTACT_EMAIL:${_contactEmail}`);
   if (_sourceUrl) bodyLines.push(`SOURCE_URL:${_sourceUrl}`);
   bodyLines.push(`CREATED:${new Date().toISOString()}`);
 
@@ -240,6 +250,71 @@ async function saveRumble(contactName, contactPhone, rumbleText) {
     body: { content: bodyLines.join('\n'), contentType: 'text' },
     importance: 'normal',
   });
+}
+
+// ── Email suggestion: pre-fill rumble text from subject ───────────────────
+function setRumbleSuggestion(subject) {
+  const ta = document.getElementById('rumbleText');
+  if (!ta || ta.value) return; // don't overwrite manual input
+  const cleaned = (subject || '').replace(/^(Re|Fw|FWD|AW|WG|Betreff):\s*/i, '').trim();
+  if (cleaned) ta.value = cleaned;
+}
+
+// ── Meeting briefing: show existing Rumbles for appointment attendees ──────
+function escapeTp(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function parseBodyFields(text) {
+  const r = {};
+  for (const line of (text || '').split('\n')) {
+    const i = line.indexOf(':');
+    if (i > 0) r[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  return r;
+}
+
+async function loadMeetingBriefing() {
+  if (!_token || !_appointmentAttendeeNames.length) return;
+  const section = document.getElementById('briefingSection');
+  const list = document.getElementById('briefingList');
+  if (!section || !list) return;
+  try {
+    const listId = await getOrCreateTembuList();
+    const data = await graphFetch('GET', `/me/todo/lists/${listId}/tasks?$filter=status ne 'completed'&$top=150`);
+    const tasks = data.value || [];
+    const matches = [];
+    for (const task of tasks) {
+      const f = parseBodyFields(task.body?.content);
+      const contactName = f.CONTACT || task.title.replace(/^Tembu:\s*/i, '');
+      const cn = contactName.toLowerCase();
+      const hit = _appointmentAttendeeNames.some(n => {
+        const mn = n.toLowerCase();
+        return mn === cn || mn.includes(cn) || cn.includes(mn);
+      });
+      if (hit) matches.push({ contactName, text: f.TEXT || contactName });
+    }
+    if (!matches.length) return;
+    section.classList.remove('hidden');
+    list.innerHTML = matches.map(m =>
+      `<div class="briefing-item"><span class="briefing-name">${escapeTp(m.contactName)}</span><span class="briefing-text">${escapeTp(m.text)}</span></div>`
+    ).join('');
+  } catch {}
+}
+
+// ── Outlook Task aus Rumble erstellen (Nachbereitung) ─────────────────────
+async function createFollowUpTask(contactName, rumbleText) {
+  try {
+    const lists = await graphFetch('GET', '/me/todo/lists');
+    const defaultList = (lists.value || []).find(l => l.isDefaultList) || lists.value?.[0];
+    if (!defaultList) return false;
+    await graphFetch('POST', `/me/todo/lists/${defaultList.id}/tasks`, {
+      title: `${contactName}: ${rumbleText.slice(0, 100)}`,
+      body: { content: rumbleText, contentType: 'text' },
+      importance: 'high',
+    });
+    return true;
+  } catch { return false; }
 }
 
 // ── Save handler ──────────────────────────────────────────────────────────
@@ -260,11 +335,38 @@ async function handleSave() {
     await saveRumble(contactName, contactPhone, rumbleText);
     showStatus('Rumble gespeichert ✓ Wird beim nächsten App-Start synchronisiert.', 'success');
     document.getElementById('rumbleText').value = '';
+    showFollowUpSection(contactName, rumbleText);
   } catch (e) {
     showStatus(`Fehler: ${e.message}`, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Rumble speichern';
+  }
+}
+
+// ── Follow-up Task section (Point 3: Erledigt + Diktat) ──────────────────
+function showFollowUpSection(contactName, rumbleText) {
+  const section = document.getElementById('followUpSection');
+  if (!section) return;
+  section.classList.remove('hidden');
+  const noteInput = document.getElementById('followUpNote');
+  if (noteInput) noteInput.value = '';
+  const btn = document.getElementById('btnFollowUp');
+  if (btn) {
+    btn.onclick = async () => {
+      const note = noteInput?.value?.trim() || rumbleText;
+      btn.disabled = true;
+      btn.textContent = 'Erstelle…';
+      const ok = await createFollowUpTask(contactName, note);
+      if (ok) {
+        showStatus('Aufgabe in Outlook erstellt ✓', 'success');
+        section.classList.add('hidden');
+      } else {
+        showStatus('Aufgabe konnte nicht erstellt werden.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Als Outlook-Aufgabe speichern';
+      }
+    };
   }
 }
 
@@ -277,6 +379,7 @@ function showForm() {
   }
   // Phone lookup needs _token — trigger after sign-in in case context was already loaded
   triggerPhoneLookup();
+  if (_itemType === Office.MailboxEnums.ItemType.Appointment) loadMeetingBriefing();
 }
 
 function showSignIn() {

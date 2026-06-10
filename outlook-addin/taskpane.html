@@ -102,13 +102,54 @@
       font-size: 12px; cursor: pointer; text-decoration: underline;
     }
 
+    /* Meeting briefing */
+    .briefing-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #2d5a5a; margin-bottom: 6px;
+    }
+    #briefingSection {
+      background: #f0f5f5; border: 1px solid #c8dada;
+      border-radius: 8px; padding: 10px 11px; margin-top: 4px;
+    }
+    .briefing-item {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 5px 0; border-bottom: 1px solid #dce8e8;
+    }
+    .briefing-item:last-child { border-bottom: none; }
+    .briefing-name { font-size: 12px; font-weight: 600; color: #2d5a5a; }
+    .briefing-text { font-size: 12px; color: #444; }
+
+    /* Follow-up task section */
+    #followUpSection {
+      background: #fffbf0; border: 1px solid #e8d8a0;
+      border-radius: 8px; padding: 10px 11px;
+    }
+    .followup-label {
+      font-size: 11px; font-weight: 600; color: #7a6020; margin-bottom: 6px;
+    }
+    .followup-input {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 6px;
+      padding: 7px 9px; font-size: 13px; color: #1a1a1a;
+      background: #fff; outline: none; font-family: inherit;
+      resize: vertical; min-height: 52px;
+    }
+    .followup-input:focus { border-color: #c8a040; }
+    .btn-followup {
+      display: block; width: 100%; margin-top: 8px;
+      background: #c8a040; color: #fff; border: none;
+      border-radius: 8px; padding: 9px; font-size: 13px;
+      font-weight: 700; cursor: pointer;
+    }
+    .btn-followup:hover { opacity: 0.88; }
+    .btn-followup:disabled { opacity: 0.45; cursor: not-allowed; }
+
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v17</span></div>
+      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v18</span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
@@ -134,6 +175,12 @@
         <button class="btn-signout" id="btnSignOut">Abmelden</button>
       </div>
 
+      <!-- Meeting briefing (Point 6): shown for appointments with existing Rumbles -->
+      <div id="briefingSection" class="hidden" style="margin-top:12px">
+        <div class="briefing-label">Rumbles für dieses Meeting</div>
+        <div id="briefingList"></div>
+      </div>
+
       <div class="field" style="margin-top:12px">
         <label>Kontakt</label>
         <input type="text" id="contactName" placeholder="Name des Kontakts" />
@@ -150,6 +197,13 @@
       </div>
 
       <button class="btn-save" id="btnSave">Rumble speichern</button>
+
+      <!-- Follow-up Outlook Task (Point 3): appears after saving a Rumble -->
+      <div id="followUpSection" class="hidden" style="margin-top:4px">
+        <div class="followup-label">Als Outlook-Aufgabe speichern (optional)</div>
+        <textarea class="followup-input" id="followUpNote" placeholder="Aufgabe oder Notiz zum Gespräch…"></textarea>
+        <button class="btn-followup" id="btnFollowUp">Als Outlook-Aufgabe speichern</button>
+      </div>
     </div>
 
     <div class="status hidden" id="statusMsg"></div>

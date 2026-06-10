@@ -10,7 +10,7 @@
 <script>
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
-const SCOPES       = ['User.Read', 'Tasks.Read', 'Chat.ReadBasic'];
+const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Chat.ReadBasic'];
 
 (async () => {
   await microsoftTeams.app.initialize();

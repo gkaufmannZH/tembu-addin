@@ -23,16 +23,6 @@
       z-index: 10;
     }
     .header-title { font-size: 15px; font-weight: 700; }
-    .search-wrap { padding: 10px 14px; background: #fff; border-bottom: 1px solid #eee; }
-    .search {
-      width: 100%;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      padding: 7px 10px;
-      font-size: 13px;
-      outline: none;
-    }
-    .search:focus { border-color: #2d5a5a; }
 
     .section { margin: 10px 0; }
     .section-header {
@@ -109,11 +99,97 @@
       color: #2d5a5a;
       padding: 10px 14px 4px;
     }
+
+    /* Notes panel */
+    .search-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+    }
+    .search {
+      flex: 1;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .search:focus { border-color: #2d5a5a; }
+    .btn-notes-toggle {
+      background: none;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: #2d5a5a;
+      cursor: pointer;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .btn-notes-toggle:hover { background: #f0f5f5; }
+    .notes-panel {
+      padding: 12px 14px;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+    }
+    .notes-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #2d5a5a;
+      margin-bottom: 6px;
+    }
+    .notes-input {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 90px;
+      font-family: inherit;
+      outline: none;
+    }
+    .notes-input:focus { border-color: #2d5a5a; }
+    .notes-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      gap: 8px;
+    }
+    .notes-participant-hint {
+      font-size: 11px;
+      color: #888;
+      flex: 1;
+    }
+    .btn-notes-save {
+      background: #2d5a5a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-notes-save:hover { opacity: 0.88; }
+    .btn-notes-save:disabled { opacity: 0.45; cursor: not-allowed; }
+    .notes-status {
+      font-size: 12px;
+      color: #2d6a2d;
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="header-title">Tembu Rumbles <span style="font-size:10px;opacity:0.6">v16</span></div>
+    <div class="header-title">Tembu Rumbles <span style="font-size:10px;opacity:0.6">v17</span></div>
   </div>
 
   <div id="notSignedIn">
@@ -122,9 +198,22 @@
   </div>
 
   <div id="signedIn" class="hidden">
-    <div class="search-wrap">
+    <div class="search-toolbar" id="searchWrap">
       <input class="search" id="searchInput" type="text" placeholder="Kontakt suchen…" />
+      <button class="btn-notes-toggle" id="btnNotes">📝 Notizen</button>
     </div>
+
+    <!-- Meeting-Notizen Panel (Point 5) -->
+    <div class="notes-panel hidden" id="notesPanel">
+      <div class="notes-label">Meeting-Notizen → Rumbles</div>
+      <textarea class="notes-input" id="notesInput" placeholder="Notizen aus dem Meeting eingeben. Für jeden Teilnehmer wird ein Rumble erstellt."></textarea>
+      <div class="notes-footer">
+        <span class="notes-participant-hint" id="notesParticipantHint"></span>
+        <button class="btn-notes-save" id="btnCreateRumbles">Rumbles erstellen</button>
+      </div>
+      <div class="notes-status" id="notesStatus"></div>
+    </div>
+
     <div id="rumbleList"></div>
   </div>
 

@@ -2,7 +2,7 @@
 
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const AUTH_URL     = 'https://gkaufmannzh.github.io/tembu.app/outlook-addin/auth.html';
-const SCOPES       = ['User.Read', 'Tasks.ReadWrite'];
+const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read'];
 const TEMBU_LIST   = 'Tembu';
 const SESSION_KEY  = '@tembu_outlook_session';
 
@@ -10,6 +10,7 @@ let _token = null;
 let _account = null;
 let _sourceUrl = null;
 let _itemType = null;
+let _contactEmail = null;
 
 // ── MSAL instance (silent refresh only — auth happens via dialog) ──────────
 const msalInstance = new msal.PublicClientApplication({
@@ -81,11 +82,19 @@ function loadOutlookContext() {
     badge.classList.remove('hidden');
     setSubject(subjectEl);
 
-    // Read mode: item.from.displayName is a string; compose mode: item.from.getAsync()
+    // Read mode: item.from has plain string properties; compose mode: getAsync()
     if (typeof item.from?.displayName === 'string') {
       contactInput.value = item.from.displayName;
+      _contactEmail = item.from.emailAddress || null;
+      triggerPhoneLookup();
     } else if (item.from?.getAsync) {
-      item.from.getAsync(r => { if (r.status === Office.AsyncResultStatus.Succeeded) contactInput.value = r.value?.displayName || ''; });
+      item.from.getAsync(r => {
+        if (r.status === Office.AsyncResultStatus.Succeeded) {
+          contactInput.value = r.value?.displayName || '';
+          _contactEmail = r.value?.emailAddress || null;
+          triggerPhoneLookup();
+        }
+      });
     }
 
     try {
@@ -102,12 +111,20 @@ function loadOutlookContext() {
     if (Array.isArray(item.requiredAttendees)) {
       const all = [...(item.requiredAttendees || []), ...(item.optionalAttendees || [])];
       const first = all.find(a => a.displayName);
-      if (first) contactInput.value = first.displayName;
+      if (first) {
+        contactInput.value = first.displayName;
+        _contactEmail = first.emailAddress || null;
+        triggerPhoneLookup();
+      }
     } else if (item.requiredAttendees?.getAsync) {
       item.requiredAttendees.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           const first = (r.value || []).find(a => a.displayName);
-          if (first) contactInput.value = first.displayName;
+          if (first) {
+            contactInput.value = first.displayName;
+            _contactEmail = first.emailAddress || null;
+            triggerPhoneLookup();
+          }
         }
       });
     }
@@ -117,6 +134,22 @@ function loadOutlookContext() {
       _sourceUrl = `https://outlook.office.com/calendar/item/${encodeURIComponent(restId)}`;
     } catch {}
   }
+}
+
+// ── Phone lookup via Graph contacts ──────────────────────────────────────
+async function triggerPhoneLookup() {
+  if (!_token || !_contactEmail) return;
+  const phoneInput = document.getElementById('contactPhone');
+  if (!phoneInput || phoneInput.value) return; // don't overwrite manual input
+
+  try {
+    const safeEmail = _contactEmail.replace(/'/g, "''");
+    const filter = encodeURIComponent(`emailAddresses/any(e:e/address eq '${safeEmail}')`);
+    const result = await graphFetch('GET', `/me/contacts?$filter=${filter}&$select=mobilePhone,businessPhones&$top=1`);
+    const contact = result.value?.[0];
+    const phone = contact?.mobilePhone || contact?.businessPhones?.[0] || null;
+    if (phone) phoneInput.value = phone;
+  } catch {}
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────
@@ -242,6 +275,8 @@ function showForm() {
   if (_account) {
     document.getElementById('userLabel').textContent = _account.name || _account.username || '';
   }
+  // Phone lookup needs _token — trigger after sign-in in case context was already loaded
+  triggerPhoneLookup();
 }
 
 function showSignIn() {

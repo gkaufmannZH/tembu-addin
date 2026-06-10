@@ -4,6 +4,7 @@ const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const AUTH_URL     = 'https://gkaufmannzh.github.io/tembu.app/outlook-addin/auth.html';
 const SCOPES       = ['User.Read', 'Tasks.ReadWrite'];
 const TEMBU_LIST   = 'Tembu';
+const SESSION_KEY  = '@tembu_outlook_session';
 
 let _token = null;
 let _account = null;
@@ -23,22 +24,34 @@ const msalInstance = new msal.PublicClientApplication({
 // ── Office init ───────────────────────────────────────────────────────────
 Office.initialize = async function () {
   await msalInstance.initialize();
+  await msalInstance.handleRedirectPromise();
 
-  // Restore stored account
+  let authed = false;
+
+  // Try MSAL silent refresh (works when MSAL cache is in taskpane's localStorage)
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length > 0) {
     try {
       const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
       _token = result.accessToken;
       _account = accounts[0];
-      showForm();
-    } catch {
-      showSignIn();
-    }
-  } else {
-    showSignIn();
+      authed = true;
+    } catch {}
   }
 
+  // Fallback: own session cache — handles Outlook Desktop where dialog/taskpane WebViews are isolated
+  if (!authed) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+      if (cached && cached.expiry > Date.now()) {
+        _token = cached.token;
+        _account = cached.account;
+        authed = true;
+      }
+    } catch {}
+  }
+
+  authed ? showForm() : showSignIn();
   loadOutlookContext();
   wireEvents();
 };
@@ -112,6 +125,14 @@ function startSignIn() {
           if (msg.success && msg.token) {
             _token = msg.token;
             _account = msg.account;
+            // Persist token for subsequent reloads (Outlook Desktop isolates dialog/taskpane WebViews)
+            try {
+              localStorage.setItem(SESSION_KEY, JSON.stringify({
+                token: msg.token,
+                account: msg.account,
+                expiry: Date.now() + 55 * 60 * 1000,
+              }));
+            } catch {}
             showForm();
             clearStatus();
           } else {

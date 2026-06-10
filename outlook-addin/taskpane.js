@@ -52,8 +52,8 @@ Office.initialize = async function () {
   }
 
   authed ? showForm() : showSignIn();
+  wireEvents();        // always wire first so buttons work even if context load fails
   loadOutlookContext();
-  wireEvents();
 };
 
 // ── Read context from current Outlook item ────────────────────────────────
@@ -67,41 +67,53 @@ function loadOutlookContext() {
   const subjectEl = document.getElementById('sourceSubject');
   const contactInput = document.getElementById('contactName');
 
+  // In read mode item.subject is a string; in compose mode it's an Office.Subject object
+  function setSubject(el) {
+    if (typeof item.subject === 'string') {
+      el.textContent = item.subject;
+    } else if (item.subject?.getAsync) {
+      item.subject.getAsync(r => { if (r.status === Office.AsyncResultStatus.Succeeded) el.textContent = r.value || ''; });
+    }
+  }
+
   if (item.itemType === Office.MailboxEnums.ItemType.Message) {
     typeEl.textContent = 'E-Mail';
-    subjectEl.textContent = item.subject || '';
     badge.classList.remove('hidden');
+    setSubject(subjectEl);
 
-    // Pre-fill contact from sender
-    if (item.from?.displayName) {
+    // Read mode: item.from.displayName is a string; compose mode: item.from.getAsync()
+    if (typeof item.from?.displayName === 'string') {
       contactInput.value = item.from.displayName;
+    } else if (item.from?.getAsync) {
+      item.from.getAsync(r => { if (r.status === Office.AsyncResultStatus.Succeeded) contactInput.value = r.value?.displayName || ''; });
     }
 
-    // Build OWA URL from EWS item ID
     try {
-      const restId = Office.context.mailbox.convertToRestId(
-        item.itemId,
-        Office.MailboxEnums.RestVersion.v2_0
-      );
+      const restId = Office.context.mailbox.convertToRestId(item.itemId, Office.MailboxEnums.RestVersion.v2_0);
       _sourceUrl = `https://outlook.office.com/mail/deeplink/read/${encodeURIComponent(restId)}`;
     } catch {}
 
   } else if (item.itemType === Office.MailboxEnums.ItemType.Appointment) {
     typeEl.textContent = 'Termin';
-    subjectEl.textContent = item.subject || '';
     badge.classList.remove('hidden');
+    setSubject(subjectEl);
 
-    // Pre-fill contact from first attendee (other than organizer)
-    const attendees = item.optionalAttendees?.concat(item.requiredAttendees ?? []) ?? [];
-    const first = attendees.find(a => a.displayName);
-    if (first) contactInput.value = first.displayName;
+    // Read mode: attendees are plain arrays; compose mode: Office.Recipients objects with getAsync()
+    if (Array.isArray(item.requiredAttendees)) {
+      const all = [...(item.requiredAttendees || []), ...(item.optionalAttendees || [])];
+      const first = all.find(a => a.displayName);
+      if (first) contactInput.value = first.displayName;
+    } else if (item.requiredAttendees?.getAsync) {
+      item.requiredAttendees.getAsync(r => {
+        if (r.status === Office.AsyncResultStatus.Succeeded) {
+          const first = (r.value || []).find(a => a.displayName);
+          if (first) contactInput.value = first.displayName;
+        }
+      });
+    }
 
-    // Build OWA URL for appointment
     try {
-      const restId = Office.context.mailbox.convertToRestId(
-        item.itemId,
-        Office.MailboxEnums.RestVersion.v2_0
-      );
+      const restId = Office.context.mailbox.convertToRestId(item.itemId, Office.MailboxEnums.RestVersion.v2_0);
       _sourceUrl = `https://outlook.office.com/calendar/item/${encodeURIComponent(restId)}`;
     } catch {}
   }

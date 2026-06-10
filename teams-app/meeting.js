@@ -2,13 +2,14 @@
 
 const CLIENT_ID   = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const AUTH_URL    = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
-const SCOPES      = ['User.Read', 'Tasks.Read'];
+const SCOPES      = ['User.Read', 'Tasks.Read', 'Chat.ReadBasic'];
 const TEMBU_LIST  = 'Tembu';
 
 let _token = null;
 let _allRumbles = [];
 let _msal = null;
 let _teamsReady = false;
+let _chatMemberNames = []; // display names of participants in current chat/meeting
 
 // ── Init ──────────────────────────────────────────────────────────────────
 wireEvents();
@@ -112,24 +113,54 @@ async function loadRumbles() {
       createdAt: f.CREATED || task.createdDateTime,
     };
   });
+  await loadChatMembers();
+}
+
+async function loadChatMembers() {
+  _chatMemberNames = [];
+  if (!_teamsReady) return;
+  try {
+    const context = await microsoftTeams.app.getContext();
+    const chatId = context.chat?.id;
+    if (!chatId) return;
+    const result = await graphGet(`/chats/${chatId}/members`);
+    _chatMemberNames = (result.value || [])
+      .map(m => m.displayName)
+      .filter(Boolean);
+  } catch {}
 }
 
 // ── Render ────────────────────────────────────────────────────────────────
+function isParticipant(contactName) {
+  if (!_chatMemberNames.length) return false;
+  const cn = contactName.toLowerCase();
+  return _chatMemberNames.some(m => {
+    const mn = m.toLowerCase();
+    return mn === cn || mn.includes(cn) || cn.includes(mn);
+  });
+}
+
 function renderRumbles(filter) {
   const query = (filter || '').toLowerCase().trim();
   const list = document.getElementById('rumbleList');
+
   const grouped = {};
   for (const r of _allRumbles) {
     if (query && !r.contactName.toLowerCase().includes(query) && !r.text.toLowerCase().includes(query)) continue;
     if (!grouped[r.contactName]) grouped[r.contactName] = [];
     grouped[r.contactName].push(r);
   }
-  const contacts = Object.keys(grouped).sort();
-  if (contacts.length === 0) {
+
+  const allContacts = Object.keys(grouped).sort();
+  if (allContacts.length === 0) {
     list.innerHTML = `<div class="empty">${query ? 'Keine Treffer.' : 'Keine aktiven Rumbles.'}</div>`;
     return;
   }
-  list.innerHTML = contacts.map(name => {
+
+  const chatContacts = allContacts.filter(n => isParticipant(n));
+  const otherContacts = allContacts.filter(n => !isParticipant(n));
+
+  const renderContact = (name, highlight) => {
     const items = grouped[name];
     const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const rows = items.map(r => {
@@ -138,8 +169,22 @@ function renderRumbles(filter) {
         ? `<a class="rumble-source" href="${r.sourceUrl}" target="_blank">↗ In Outlook öffnen</a>` : '';
       return `<div class="rumble-item"><div class="rumble-text">${escapeHtml(r.text)}</div><div class="rumble-meta">${date}</div>${link}</div>`;
     }).join('');
-    return `<div class="section"><div class="section-header"><div class="avatar">${initials}</div><div class="contact-name">${escapeHtml(name)}</div><div class="rumble-count">${items.length} Rumble${items.length !== 1 ? 's' : ''}</div></div>${rows}</div>`;
-  }).join('');
+    const border = highlight ? 'border-left:3px solid #2d5a5a;' : '';
+    return `<div class="section" style="${border}"><div class="section-header"><div class="avatar">${initials}</div><div class="contact-name">${escapeHtml(name)}</div><div class="rumble-count">${items.length} Rumble${items.length !== 1 ? 's' : ''}</div></div>${rows}</div>`;
+  };
+
+  let html = '';
+  if (chatContacts.length > 0) {
+    html += `<div class="chat-section-label">Teilnehmer dieses Chats</div>`;
+    html += chatContacts.map(n => renderContact(n, true)).join('');
+    if (otherContacts.length > 0) {
+      html += `<div class="chat-section-label" style="opacity:0.5">Weitere Rumbles</div>`;
+      html += otherContacts.map(n => renderContact(n, false)).join('');
+    }
+  } else {
+    html += allContacts.map(n => renderContact(n, false)).join('');
+  }
+  list.innerHTML = html;
 }
 
 function escapeHtml(str) {

@@ -190,7 +190,7 @@ async function getOrCreateTembuList() {
   return created.id;
 }
 
-async function saveRumble(contactName, rumbleText) {
+async function saveRumble(contactName, contactPhone, rumbleText) {
   const listId = await getOrCreateTembuList();
 
   const bodyLines = [
@@ -198,6 +198,7 @@ async function saveRumble(contactName, rumbleText) {
     `CONTACT:${contactName}`,
     `SOURCE_TYPE:${_itemType === Office.MailboxEnums.ItemType.Appointment ? 'appointment' : 'message'}`,
   ];
+  if (contactPhone) bodyLines.push(`CONTACT_PHONE:${contactPhone}`);
   if (_sourceUrl) bodyLines.push(`SOURCE_URL:${_sourceUrl}`);
   bodyLines.push(`CREATED:${new Date().toISOString()}`);
 
@@ -210,8 +211,9 @@ async function saveRumble(contactName, rumbleText) {
 
 // ── Save handler ──────────────────────────────────────────────────────────
 async function handleSave() {
-  const contactName = document.getElementById('contactName').value.trim();
-  const rumbleText  = document.getElementById('rumbleText').value.trim();
+  const contactName  = document.getElementById('contactName').value.trim();
+  const contactPhone = document.getElementById('contactPhone').value.trim();
+  const rumbleText   = document.getElementById('rumbleText').value.trim();
 
   if (!contactName) { showStatus('Bitte einen Kontaktnamen eingeben.', 'error'); return; }
   if (!rumbleText)  { showStatus('Bitte einen Rumble-Text eingeben.', 'error'); return; }
@@ -222,7 +224,7 @@ async function handleSave() {
   clearStatus();
 
   try {
-    await saveRumble(contactName, rumbleText);
+    await saveRumble(contactName, contactPhone, rumbleText);
     showStatus('Rumble gespeichert ✓ Wird beim nächsten App-Start synchronisiert.', 'success');
     document.getElementById('rumbleText').value = '';
   } catch (e) {

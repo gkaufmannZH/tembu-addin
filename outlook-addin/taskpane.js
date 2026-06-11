@@ -323,6 +323,12 @@ function signOut() {
   showSignIn();
 }
 
+// ── ID generation ─────────────────────────────────────────────────────────
+function generateRumbleId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
 // ── Graph helpers ─────────────────────────────────────────────────────────
 async function graphFetch(method, path, body) {
   const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
@@ -350,6 +356,7 @@ async function saveRumble(contactName, contactPhone, rumbleText) {
   const listId = await getOrCreateTembuList();
 
   const bodyLines = [
+    `RUMBLE_ID:${generateRumbleId()}`,
     `TEXT:${rumbleText}`,
     `CONTACT:${contactName}`,
     `SOURCE_TYPE:${_itemType === Office.MailboxEnums.ItemType.Appointment ? 'appointment' : 'message'}`,
@@ -403,7 +410,8 @@ async function loadMeetingBriefing() {
       const f = parseBodyFields(task.body?.content);
       const contactName = f.CONTACT || task.title.replace(/^Tembu:\s*/i, '');
       const text = f.TEXT || contactName;
-      const dedupKey = `${contactName.toLowerCase().trim()}||${text.toLowerCase().trim()}`;
+      const dedupKey = f.RUMBLE_ID || f.MEMO_ID ||
+        `${contactName.toLowerCase().trim()}||${text.toLowerCase().trim()}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
       const cn = contactName.toLowerCase();
@@ -588,10 +596,11 @@ async function loadAllRumbles() {
       const f = parseBodyFields(task.body?.content);
       const contactName = f.CONTACT || task.title.replace(/^Tembu:\s*/i, '');
       const text = f.TEXT || contactName;
-      const key = `${contactName.toLowerCase().trim()}||${text.toLowerCase().trim()}`;
+      const key = f.RUMBLE_ID || f.MEMO_ID ||
+        `${contactName.toLowerCase().trim()}||${text.toLowerCase().trim()}`;
       if (dedupSeen.has(key)) return acc;
       dedupSeen.add(key);
-      acc.push({ contactName, text, createdAt: f.CREATED || task.createdDateTime });
+      acc.push({ contactName, text, createdAt: f.CREATED || task.createdDateTime, rumbleId: f.RUMBLE_ID || f.MEMO_ID || null });
       return acc;
     }, []);
     _rumbleLoaded = true;

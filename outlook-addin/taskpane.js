@@ -120,6 +120,7 @@ function loadOutlookContext() {
     if (Array.isArray(item.requiredAttendees)) {
       const all = [...(item.requiredAttendees || []), ...(item.optionalAttendees || [])];
       _appointmentAttendeeNames = all.map(a => a.displayName).filter(Boolean);
+      updateBrowseTabLabel();
       const first = all.find(a => a.displayName);
       if (first) {
         contactInput.value = first.displayName;
@@ -130,6 +131,7 @@ function loadOutlookContext() {
       item.requiredAttendees.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           _appointmentAttendeeNames = (r.value || []).map(a => a.displayName).filter(Boolean);
+          updateBrowseTabLabel();
           const first = (r.value || []).find(a => a.displayName);
           if (first) {
             contactInput.value = first.displayName;
@@ -372,14 +374,31 @@ function showFollowUpSection(contactName, rumbleText) {
   }
 }
 
-// ── Rumble Browse (Tab: Alle Rumbles) ─────────────────────────────────────
+// ── Rumble Browse (Tab: Alle Rumbles / Teilnehmer) ────────────────────────
 function showTab(tab) {
   const isCreate = tab === 'create';
   document.getElementById('createPane').classList.toggle('hidden', !isCreate);
   document.getElementById('browsePane').classList.toggle('hidden', isCreate);
   document.getElementById('tabCreate').classList.toggle('active', isCreate);
   document.getElementById('tabBrowse').classList.toggle('active', !isCreate);
-  if (!isCreate && !_rumbleLoaded) loadAllRumbles();
+  if (!isCreate) {
+    const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
+    const hasAttendees = isAppt && _appointmentAttendeeNames.length > 0;
+    const searchEl = document.getElementById('rumbleSearch');
+    if (searchEl) {
+      searchEl.placeholder = hasAttendees
+        ? `Suche in ${_appointmentAttendeeNames.length} Teilnehmer-Rumbles…`
+        : 'Kontakt suchen…';
+    }
+    if (!_rumbleLoaded) loadAllRumbles();
+    else renderAllRumbles(searchEl?.value || '');
+  }
+}
+
+function updateBrowseTabLabel() {
+  const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
+  const tabBrowse = document.getElementById('tabBrowse');
+  if (tabBrowse) tabBrowse.textContent = (isAppt && _appointmentAttendeeNames.length) ? 'Teilnehmer' : 'Alle Rumbles';
 }
 
 async function loadAllRumbles() {
@@ -408,15 +427,33 @@ function renderAllRumbles(filter) {
   const panel = document.getElementById('rumbleBrowsePanel');
   if (!panel) return;
   const q = (filter || '').toLowerCase().trim();
+
+  // In appointment view: only show Rumbles for attendees
+  const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
+  const hasAttendees = isAppt && _appointmentAttendeeNames.length > 0;
+  let source = _allRumbles;
+  if (hasAttendees) {
+    source = _allRumbles.filter(r => {
+      const cn = r.contactName.toLowerCase();
+      return _appointmentAttendeeNames.some(n => {
+        const mn = n.toLowerCase();
+        return mn === cn || mn.includes(cn) || cn.includes(mn);
+      });
+    });
+  }
+
   const grouped = {};
-  for (const r of _allRumbles) {
+  for (const r of source) {
     if (q && !r.contactName.toLowerCase().includes(q) && !r.text.toLowerCase().includes(q)) continue;
     if (!grouped[r.contactName]) grouped[r.contactName] = [];
     grouped[r.contactName].push(r);
   }
   const contacts = Object.keys(grouped).sort();
   if (!contacts.length) {
-    panel.innerHTML = `<div class="rumble-empty">${q ? 'Keine Treffer.' : 'Keine aktiven Rumbles.'}</div>`;
+    const msg = hasAttendees
+      ? 'Keine Rumbles für die Teilnehmer dieses Termins.'
+      : (q ? 'Keine Treffer.' : 'Keine aktiven Rumbles.');
+    panel.innerHTML = `<div class="rumble-empty">${msg}</div>`;
     return;
   }
   panel.innerHTML = contacts.map(name => {

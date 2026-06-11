@@ -102,6 +102,38 @@
       font-size: 12px; cursor: pointer; text-decoration: underline;
     }
 
+    /* Tab bar */
+    .tab-bar {
+      display: flex; gap: 0; border-bottom: 2px solid #eee; margin-bottom: 14px;
+    }
+    .tab-btn {
+      flex: 1; background: none; border: none; border-bottom: 2px solid transparent;
+      padding: 9px 6px; font-size: 13px; font-weight: 600; color: #888;
+      cursor: pointer; margin-bottom: -2px; transition: color 0.15s;
+    }
+    .tab-btn.active { color: #2d5a5a; border-bottom-color: #2d5a5a; }
+    .tab-btn:hover { color: #2d5a5a; }
+
+    /* Rumble browse */
+    .rumble-search {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 8px;
+      padding: 8px 11px; font-size: 13px; outline: none; margin-bottom: 10px;
+    }
+    .rumble-search:focus { border-color: #2d5a5a; }
+    .rumble-group { margin-bottom: 8px; }
+    .rumble-group-name {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4px; color: #2d5a5a; padding: 4px 0 3px;
+      border-bottom: 1px solid #e8f0f0; margin-bottom: 4px;
+    }
+    .rumble-row {
+      font-size: 13px; color: #333; padding: 4px 0; line-height: 1.4;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .rumble-row:last-child { border-bottom: none; }
+    .rumble-empty { font-size: 13px; color: #aaa; text-align: center; padding: 20px 0; }
+    #rumbleBrowsePanel { max-height: 60vh; overflow-y: auto; }
+
     /* Meeting briefing */
     .briefing-label {
       font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -149,7 +181,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v19</span></div>
+      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v20</span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
@@ -175,13 +207,22 @@
         <button class="btn-signout" id="btnSignOut">Abmelden</button>
       </div>
 
+      <!-- Tab bar -->
+      <div class="tab-bar" style="margin-top:10px">
+        <button class="tab-btn active" id="tabCreate" onclick="showTab('create')">Erstellen</button>
+        <button class="tab-btn" id="tabBrowse" onclick="showTab('browse')">Alle Rumbles</button>
+      </div>
+
+      <!-- Tab: Erstellen -->
+      <div id="createPane">
+
       <!-- Meeting briefing (Point 6): shown for appointments with existing Rumbles -->
-      <div id="briefingSection" class="hidden" style="margin-top:12px">
+      <div id="briefingSection" class="hidden">
         <div class="briefing-label">Rumbles für dieses Meeting</div>
         <div id="briefingList"></div>
       </div>
 
-      <div class="field" style="margin-top:12px">
+      <div class="field" style="margin-top:4px">
         <label>Kontakt</label>
         <input type="text" id="contactName" placeholder="Name des Kontakts" />
       </div>
@@ -203,6 +244,14 @@
         <div class="followup-label">Als Outlook-Aufgabe speichern (optional)</div>
         <textarea class="followup-input" id="followUpNote" placeholder="Aufgabe oder Notiz zum Gespräch…"></textarea>
         <button class="btn-followup" id="btnFollowUp">Als Outlook-Aufgabe speichern</button>
+      </div>
+
+      </div><!-- end #createPane -->
+
+      <!-- Tab: Alle Rumbles -->
+      <div id="browsePane" class="hidden">
+        <input class="rumble-search" id="rumbleSearch" type="text" placeholder="Kontakt suchen…" oninput="filterRumbles(this.value)" />
+        <div id="rumbleBrowsePanel"><div class="rumble-empty">Lade…</div></div>
       </div>
     </div>
 

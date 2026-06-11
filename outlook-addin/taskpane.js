@@ -12,6 +12,8 @@ let _sourceUrl = null;
 let _itemType = null;
 let _contactEmail = null;
 let _appointmentAttendeeNames = [];
+let _allRumbles = [];
+let _rumbleLoaded = false;
 
 // ── MSAL instance (silent refresh only — auth happens via dialog) ──────────
 const msalInstance = new msal.PublicClientApplication({
@@ -368,6 +370,65 @@ function showFollowUpSection(contactName, rumbleText) {
       }
     };
   }
+}
+
+// ── Rumble Browse (Tab: Alle Rumbles) ─────────────────────────────────────
+function showTab(tab) {
+  const isCreate = tab === 'create';
+  document.getElementById('createPane').classList.toggle('hidden', !isCreate);
+  document.getElementById('browsePane').classList.toggle('hidden', isCreate);
+  document.getElementById('tabCreate').classList.toggle('active', isCreate);
+  document.getElementById('tabBrowse').classList.toggle('active', !isCreate);
+  if (!isCreate && !_rumbleLoaded) loadAllRumbles();
+}
+
+async function loadAllRumbles() {
+  const panel = document.getElementById('rumbleBrowsePanel');
+  if (!panel) return;
+  panel.innerHTML = '<div class="rumble-empty">Lade…</div>';
+  try {
+    const listId = await getOrCreateTembuList();
+    const data = await graphFetch('GET', `/me/todo/lists/${listId}/tasks?$filter=status ne 'completed'&$top=200`);
+    _allRumbles = (data.value || []).map(task => {
+      const f = parseBodyFields(task.body?.content);
+      return {
+        contactName: f.CONTACT || task.title.replace(/^Tembu:\s*/i, ''),
+        text: f.TEXT || task.title.replace(/^Tembu:\s*/i, ''),
+        createdAt: f.CREATED || task.createdDateTime,
+      };
+    });
+    _rumbleLoaded = true;
+    renderAllRumbles('');
+  } catch (e) {
+    if (panel) panel.innerHTML = `<div class="rumble-empty">Fehler: ${escapeTp(e.message)}</div>`;
+  }
+}
+
+function renderAllRumbles(filter) {
+  const panel = document.getElementById('rumbleBrowsePanel');
+  if (!panel) return;
+  const q = (filter || '').toLowerCase().trim();
+  const grouped = {};
+  for (const r of _allRumbles) {
+    if (q && !r.contactName.toLowerCase().includes(q) && !r.text.toLowerCase().includes(q)) continue;
+    if (!grouped[r.contactName]) grouped[r.contactName] = [];
+    grouped[r.contactName].push(r);
+  }
+  const contacts = Object.keys(grouped).sort();
+  if (!contacts.length) {
+    panel.innerHTML = `<div class="rumble-empty">${q ? 'Keine Treffer.' : 'Keine aktiven Rumbles.'}</div>`;
+    return;
+  }
+  panel.innerHTML = contacts.map(name => {
+    const rows = grouped[name].map(r =>
+      `<div class="rumble-row">${escapeTp(r.text)}</div>`
+    ).join('');
+    return `<div class="rumble-group"><div class="rumble-group-name">${escapeTp(name)}</div>${rows}</div>`;
+  }).join('');
+}
+
+function filterRumbles(val) {
+  renderAllRumbles(val);
 }
 
 // ── UI helpers ────────────────────────────────────────────────────────────

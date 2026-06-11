@@ -61,7 +61,37 @@ Office.initialize = async function () {
   wireEvents();
   loadOutlookContext();
   if (authed) loadContactDirectory();
+
+  // When taskpane is pinned and user navigates to another item, reload context
+  try {
+    Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () {
+      resetItemContext();
+      loadOutlookContext();
+    });
+  } catch {}
 };
+
+// ── Reset per-item state (called on ItemChanged when taskpane is pinned) ──
+function resetItemContext() {
+  _allRumbles = [];
+  _rumbleLoaded = false;
+  _messageParticipantNames = [];
+  _appointmentAttendeeNames = [];
+  _contactEmail = null;
+  _sourceUrl = null;
+  _itemType = null;
+
+  ['contactName', 'contactPhone', 'rumbleText'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['participantPicker', 'followUpSection', 'briefingSection', 'sourceBadge'].forEach(id => {
+    document.getElementById(id)?.classList.add('hidden');
+  });
+
+  clearStatus();
+  updateBrowseTabLabel();
+}
 
 // ── Read context from current Outlook item ────────────────────────────────
 function loadOutlookContext() {
@@ -106,7 +136,9 @@ function loadOutlookContext() {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           contactInput.value = r.value?.displayName || '';
           _contactEmail = r.value?.emailAddress || null;
-          if (r.value?.displayName) { _messageParticipantNames.push(r.value.displayName); updateBrowseTabLabel(); }
+          if (r.value?.displayName) _messageParticipantNames.push(r.value.displayName);
+          updateBrowseTabLabel();
+          showParticipantPicker(_messageParticipantNames);
           triggerPhoneLookup();
         }
       });
@@ -120,10 +152,12 @@ function loadOutlookContext() {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           _messageParticipantNames.push(...(r.value || []).map(a => a.displayName).filter(Boolean));
           updateBrowseTabLabel();
+          showParticipantPicker(_messageParticipantNames);
         }
       });
     }
     updateBrowseTabLabel();
+    showParticipantPicker(_messageParticipantNames);
 
     try {
       const restId = Office.context.mailbox.convertToRestId(item.itemId, Office.MailboxEnums.RestVersion.v2_0);
@@ -146,6 +180,7 @@ function loadOutlookContext() {
         _contactEmail = first.emailAddress || null;
         triggerPhoneLookup();
       }
+      showParticipantPicker(_appointmentAttendeeNames);
     } else if (item.requiredAttendees?.getAsync) {
       item.requiredAttendees.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
@@ -157,6 +192,7 @@ function loadOutlookContext() {
             _contactEmail = first.emailAddress || null;
             triggerPhoneLookup();
           }
+          showParticipantPicker(_appointmentAttendeeNames);
         }
       });
     }
@@ -474,6 +510,33 @@ function updateBrowseTabLabel() {
   if (isAppt && _appointmentAttendeeNames.length) tabBrowse.textContent = 'Teilnehmer';
   else if (isMsg && _messageParticipantNames.length) tabBrowse.textContent = 'Empfänger';
   else tabBrowse.textContent = 'Alle Rumbles';
+}
+
+// ── Participant picker ────────────────────────────────────────────────────
+function showParticipantPicker(names) {
+  const picker = document.getElementById('participantPicker');
+  const chips  = document.getElementById('participantChips');
+  if (!picker || !chips) return;
+  const unique = [...new Set(names)].filter(Boolean);
+  if (unique.length <= 1) { picker.classList.add('hidden'); return; }
+
+  const current = document.getElementById('contactName')?.value || '';
+  chips.innerHTML = unique.map(name => {
+    const active = name.toLowerCase() === current.toLowerCase() ? ' active' : '';
+    return `<button class="participant-chip${active}" onclick="selectParticipant(${JSON.stringify(name)})">${escapeTp(name)}</button>`;
+  }).join('');
+  picker.classList.remove('hidden');
+}
+
+function selectParticipant(name) {
+  const contactInput = document.getElementById('contactName');
+  if (contactInput) contactInput.value = name;
+  document.querySelectorAll('.participant-chip').forEach(c => {
+    c.classList.toggle('active', c.textContent === name);
+  });
+  const phoneInput = document.getElementById('contactPhone');
+  if (phoneInput) phoneInput.value = '';
+  triggerPhoneLookup();
 }
 
 function _contextParticipants() {

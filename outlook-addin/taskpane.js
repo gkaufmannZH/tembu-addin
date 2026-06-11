@@ -305,15 +305,20 @@ async function loadMeetingBriefing() {
     const data = await graphFetch('GET', `/me/todo/lists/${listId}/tasks?$filter=status ne 'completed'&$top=150`);
     const tasks = data.value || [];
     const matches = [];
+    const seen = new Set();
     for (const task of tasks) {
       const f = parseBodyFields(task.body?.content);
       const contactName = f.CONTACT || task.title.replace(/^Tembu:\s*/i, '');
+      const text = f.TEXT || contactName;
+      const dedupKey = f.MEMO_ID || `${contactName}||${text}`;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
       const cn = contactName.toLowerCase();
       const hit = _appointmentAttendeeNames.some(n => {
         const mn = n.toLowerCase();
         return mn === cn || mn.includes(cn) || cn.includes(mn);
       });
-      if (hit) matches.push({ contactName, text: f.TEXT || contactName });
+      if (hit) matches.push({ contactName, text });
     }
     if (!matches.length) return;
     section.classList.remove('hidden');
@@ -439,14 +444,17 @@ async function loadAllRumbles() {
   try {
     const listId = await getOrCreateTembuList();
     const data = await graphFetch('GET', `/me/todo/lists/${listId}/tasks?$filter=status ne 'completed'&$top=200`);
-    _allRumbles = (data.value || []).map(task => {
+    const dedupSeen = new Set();
+    _allRumbles = (data.value || []).reduce((acc, task) => {
       const f = parseBodyFields(task.body?.content);
-      return {
-        contactName: f.CONTACT || task.title.replace(/^Tembu:\s*/i, ''),
-        text: f.TEXT || task.title.replace(/^Tembu:\s*/i, ''),
-        createdAt: f.CREATED || task.createdDateTime,
-      };
-    });
+      const contactName = f.CONTACT || task.title.replace(/^Tembu:\s*/i, '');
+      const text = f.TEXT || contactName;
+      const key = f.MEMO_ID || `${contactName}||${text}`;
+      if (dedupSeen.has(key)) return acc;
+      dedupSeen.add(key);
+      acc.push({ contactName, text, createdAt: f.CREATED || task.createdDateTime });
+      return acc;
+    }, []);
     _rumbleLoaded = true;
     renderAllRumbles('');
   } catch (e) {

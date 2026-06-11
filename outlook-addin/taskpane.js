@@ -238,11 +238,15 @@ async function loadContactsFromGraph() {
     const datalist = document.getElementById('contactSuggestions');
     if (datalist) {
       datalist.innerHTML = _contactDirectory
-        .map(c => `<option value="${c.name.replace(/"/g, '&quot;')}">`)
+        .map(c => `<option value="${escapeTp(c.name).replace(/"/g, '&quot;')}">`)
         .join('');
     }
-    // If still in no-item mode, populate the picker now that contacts are loaded
-    if (!Office.context.mailbox?.item) showContactPickerSection();
+    if (Office.context.mailbox?.item) {
+      // Re-run phone lookup now that directory is populated
+      triggerPhoneLookup();
+    } else {
+      showContactPickerSection();
+    }
   } catch {}
 }
 
@@ -305,7 +309,8 @@ function selectContactFromPicker(name, phone) {
   const phoneInput = document.getElementById('contactPhone');
   if (phoneInput) phoneInput.value = phone || '';
   document.getElementById('contactPickerSection')?.classList.add('hidden');
-  document.getElementById('contactPickerSearch').value = '';
+  const searchEl = document.getElementById('contactPickerSearch');
+  if (searchEl) searchEl.value = '';
   document.getElementById('rumbleText')?.focus();
 }
 
@@ -337,6 +342,7 @@ function startSignIn() {
             } catch {}
             showForm();
             clearStatus();
+            loadContactsFromGraph();
           } else {
             showStatus(msg.error || 'Anmeldung fehlgeschlagen.', 'error');
           }
@@ -354,6 +360,7 @@ function signOut() {
   localStorage.clear();
   _token = null;
   _account = null;
+  _contactDirectory = [];
   showSignIn();
 }
 

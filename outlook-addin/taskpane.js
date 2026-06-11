@@ -89,6 +89,11 @@ function resetItemContext() {
     document.getElementById(id)?.classList.add('hidden');
   });
 
+  // Remove any existing ribbon notification from previous item
+  try {
+    Office.context.mailbox?.item?.notificationMessages?.removeAsync('tembu-badge', () => {});
+  } catch {}
+
   clearStatus();
   updateBrowseTabLabel();
 }
@@ -181,6 +186,7 @@ function loadOutlookContext() {
         triggerPhoneLookup();
       }
       showParticipantPicker(_appointmentAttendeeNames);
+      if (_token) loadMeetingBriefing();
     } else if (item.requiredAttendees?.getAsync) {
       item.requiredAttendees.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
@@ -193,6 +199,7 @@ function loadOutlookContext() {
             triggerPhoneLookup();
           }
           showParticipantPicker(_appointmentAttendeeNames);
+          if (_token) loadMeetingBriefing();
         }
       });
     }
@@ -406,6 +413,23 @@ async function loadMeetingBriefing() {
       });
       if (hit) matches.push({ contactName, text });
     }
+    // Show notification badge in the Outlook reading pane (visible even without taskpane open)
+    try {
+      const nm = Office.context.mailbox?.item?.notificationMessages;
+      if (nm) {
+        if (matches.length > 0) {
+          nm.addAsync('tembu-badge', {
+            type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
+            message: `Tembu: ${matches.length} Rumble${matches.length !== 1 ? 's' : ''} für dieses Meeting`,
+            icon: 'Icon.16',
+            persistent: false,
+          });
+        } else {
+          nm.removeAsync('tembu-badge', () => {});
+        }
+      }
+    } catch {}
+
     if (!matches.length) return;
     section.classList.remove('hidden');
     list.innerHTML = matches.map(m =>

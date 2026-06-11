@@ -14,6 +14,7 @@ let _contactEmail = null;
 let _appointmentAttendeeNames = [];
 let _allRumbles = [];
 let _rumbleLoaded = false;
+let _messageParticipantNames = [];
 
 // ── MSAL instance (silent refresh only — auth happens via dialog) ──────────
 const msalInstance = new msal.PublicClientApplication({
@@ -90,21 +91,37 @@ function loadOutlookContext() {
     typeEl.textContent = 'E-Mail';
     badge.classList.remove('hidden');
     setSubject(subjectEl);
+    _messageParticipantNames = [];
 
-    // Read mode: item.from has plain string properties; compose mode: getAsync()
+    // Sender
     if (typeof item.from?.displayName === 'string') {
       contactInput.value = item.from.displayName;
       _contactEmail = item.from.emailAddress || null;
+      if (item.from.displayName) _messageParticipantNames.push(item.from.displayName);
       triggerPhoneLookup();
     } else if (item.from?.getAsync) {
       item.from.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           contactInput.value = r.value?.displayName || '';
           _contactEmail = r.value?.emailAddress || null;
+          if (r.value?.displayName) { _messageParticipantNames.push(r.value.displayName); updateBrowseTabLabel(); }
           triggerPhoneLookup();
         }
       });
     }
+
+    // Recipients (To)
+    if (Array.isArray(item.to)) {
+      _messageParticipantNames.push(...item.to.map(r => r.displayName).filter(Boolean));
+    } else if (item.to?.getAsync) {
+      item.to.getAsync(r => {
+        if (r.status === Office.AsyncResultStatus.Succeeded) {
+          _messageParticipantNames.push(...(r.value || []).map(a => a.displayName).filter(Boolean));
+          updateBrowseTabLabel();
+        }
+      });
+    }
+    updateBrowseTabLabel();
 
     try {
       const restId = Office.context.mailbox.convertToRestId(item.itemId, Office.MailboxEnums.RestVersion.v2_0);
@@ -382,12 +399,11 @@ function showTab(tab) {
   document.getElementById('tabCreate').classList.toggle('active', isCreate);
   document.getElementById('tabBrowse').classList.toggle('active', !isCreate);
   if (!isCreate) {
-    const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
-    const hasAttendees = isAppt && _appointmentAttendeeNames.length > 0;
+    const participants = _contextParticipants();
     const searchEl = document.getElementById('rumbleSearch');
     if (searchEl) {
-      searchEl.placeholder = hasAttendees
-        ? `Suche in ${_appointmentAttendeeNames.length} Teilnehmer-Rumbles…`
+      searchEl.placeholder = participants.length
+        ? `Suche in ${participants.length} Teilnehmer-Rumbles…`
         : 'Kontakt suchen…';
     }
     if (!_rumbleLoaded) loadAllRumbles();
@@ -397,8 +413,23 @@ function showTab(tab) {
 
 function updateBrowseTabLabel() {
   const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
+  const isMsg  = _itemType === Office.MailboxEnums.ItemType.Message;
+  const hasCtx = (isAppt && _appointmentAttendeeNames.length) || (isMsg && _messageParticipantNames.length);
   const tabBrowse = document.getElementById('tabBrowse');
-  if (tabBrowse) tabBrowse.textContent = (isAppt && _appointmentAttendeeNames.length) ? 'Teilnehmer' : 'Alle Rumbles';
+  if (tabBrowse) tabBrowse.textContent = hasCtx ? 'Teilnehmer' : 'Alle Rumbles';
+}
+
+function _contextParticipants() {
+  if (_itemType === Office.MailboxEnums.ItemType.Appointment) return _appointmentAttendeeNames;
+  if (_itemType === Office.MailboxEnums.ItemType.Message)     return _messageParticipantNames;
+  return [];
+}
+
+function _filterByNames(rumbles, names) {
+  return rumbles.filter(r => {
+    const cn = r.contactName.toLowerCase();
+    return names.some(n => { const mn = n.toLowerCase(); return mn === cn || mn.includes(cn) || cn.includes(mn); });
+  });
 }
 
 async function loadAllRumbles() {
@@ -428,19 +459,9 @@ function renderAllRumbles(filter) {
   if (!panel) return;
   const q = (filter || '').toLowerCase().trim();
 
-  // In appointment view: only show Rumbles for attendees
-  const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
-  const hasAttendees = isAppt && _appointmentAttendeeNames.length > 0;
-  let source = _allRumbles;
-  if (hasAttendees) {
-    source = _allRumbles.filter(r => {
-      const cn = r.contactName.toLowerCase();
-      return _appointmentAttendeeNames.some(n => {
-        const mn = n.toLowerCase();
-        return mn === cn || mn.includes(cn) || cn.includes(mn);
-      });
-    });
-  }
+  // In appointment/email view: only show Rumbles for participants
+  const participants = _contextParticipants();
+  let source = participants.length ? _filterByNames(_allRumbles, participants) : _allRumbles;
 
   const grouped = {};
   for (const r of source) {
@@ -450,8 +471,8 @@ function renderAllRumbles(filter) {
   }
   const contacts = Object.keys(grouped).sort();
   if (!contacts.length) {
-    const msg = hasAttendees
-      ? 'Keine Rumbles für die Teilnehmer dieses Termins.'
+    const msg = participants.length
+      ? 'Keine Rumbles für die Teilnehmer.'
       : (q ? 'Keine Treffer.' : 'Keine aktiven Rumbles.');
     panel.innerHTML = `<div class="rumble-empty">${msg}</div>`;
     return;

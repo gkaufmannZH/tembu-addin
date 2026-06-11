@@ -310,7 +310,7 @@ async function loadMeetingBriefing() {
       const f = parseBodyFields(task.body?.content);
       const contactName = f.CONTACT || task.title.replace(/^Tembu:\s*/i, '');
       const text = f.TEXT || contactName;
-      const dedupKey = f.MEMO_ID || `${contactName}||${text}`;
+      const dedupKey = `${contactName.toLowerCase().trim()}||${text.toLowerCase().trim()}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
       const cn = contactName.toLowerCase();
@@ -449,7 +449,7 @@ async function loadAllRumbles() {
       const f = parseBodyFields(task.body?.content);
       const contactName = f.CONTACT || task.title.replace(/^Tembu:\s*/i, '');
       const text = f.TEXT || contactName;
-      const key = f.MEMO_ID || `${contactName}||${text}`;
+      const key = `${contactName.toLowerCase().trim()}||${text.toLowerCase().trim()}`;
       if (dedupSeen.has(key)) return acc;
       dedupSeen.add(key);
       acc.push({ contactName, text, createdAt: f.CREATED || task.createdDateTime });

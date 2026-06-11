@@ -175,6 +175,16 @@
     .btn-followup:hover { opacity: 0.88; }
     .btn-followup:disabled { opacity: 0.45; cursor: not-allowed; }
 
+    /* Contact picker (Ribbon-Button mode) */
+    .contact-picker-row {
+      padding: 8px 11px; cursor: pointer; border-bottom: 1px solid #f0f0f0;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .contact-picker-row:hover { background: #f0f5f5; }
+    .contact-picker-row:last-child { border-bottom: none; }
+    .contact-picker-name { font-size: 13px; color: #1a1a1a; font-weight: 500; }
+    .contact-picker-phone { font-size: 11px; color: #888; }
+
     /* Participant picker */
     .participant-picker-label { font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; }
     .participant-chip {
@@ -192,7 +202,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v30 · M1.0.2.9</span></div>
+      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v31 · M1.0.3.0</span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
@@ -226,6 +236,12 @@
 
       <!-- Tab: Erstellen -->
       <div id="createPane">
+
+      <!-- Contact picker: shown when Ribbon-Button clicked (no email/meeting context) -->
+      <div id="contactPickerSection" class="hidden">
+        <input class="rumble-search" type="text" id="contactPickerSearch" placeholder="Kontakt suchen…" oninput="filterContactPicker(this.value)" style="margin-bottom:6px" />
+        <div id="contactPickerList" style="max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:8px"></div>
+      </div>
 
       <!-- Meeting briefing (Point 6): shown for appointments with existing Rumbles -->
       <div id="briefingSection" class="hidden">
@@ -282,6 +298,6 @@
     </div>
   </div>
 
-  <script src="taskpane.js?v=20260615"></script>
+  <script src="taskpane.js?v=20260611"></script>
 </body>
 </html>

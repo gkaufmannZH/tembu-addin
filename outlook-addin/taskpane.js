@@ -15,7 +15,7 @@ let _appointmentAttendeeNames = [];
 let _allRumbles = [];
 let _rumbleLoaded = false;
 let _messageParticipantNames = [];
-let _contactDirectory = []; // { name, phone, email } from Tembu Kontakte
+let _contactDirectory = []; // { name, phone } from /me/contacts
 
 // ── MSAL instance (silent refresh only — auth happens via dialog) ──────────
 const msalInstance = new msal.PublicClientApplication({
@@ -60,7 +60,7 @@ Office.initialize = async function () {
   authed ? showForm() : showSignIn();
   wireEvents();
   loadOutlookContext();
-  if (authed) loadContactDirectory();
+  if (authed) loadContactsFromGraph();
 
   // When taskpane is pinned and user navigates to another item, reload context
   try {
@@ -85,7 +85,7 @@ function resetItemContext() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['participantPicker', 'followUpSection', 'briefingSection', 'sourceBadge'].forEach(id => {
+  ['participantPicker', 'followUpSection', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
 
@@ -101,7 +101,12 @@ function resetItemContext() {
 // ── Read context from current Outlook item ────────────────────────────────
 function loadOutlookContext() {
   const item = Office.context.mailbox?.item;
-  if (!item) return;
+  if (!item) {
+    // No email/meeting selected (Ribbon-Button mode): show contact picker
+    showContactPickerSection();
+    return;
+  }
+  document.getElementById('contactPickerSection')?.classList.add('hidden');
 
   _itemType = item.itemType;
   const badge = document.getElementById('sourceBadge');
@@ -211,68 +216,97 @@ function loadOutlookContext() {
   }
 }
 
-// ── Contact directory (from Tembu Kontakte To-Do list) ───────────────────
-async function loadContactDirectory() {
+// ── Contact directory (from /me/contacts) ────────────────────────────────
+async function loadContactsFromGraph() {
   try {
-    const lists = await graphFetch('GET', '/me/todo/lists');
-    const list = (lists.value || []).find(l => l.displayName === 'Tembu Kontakte');
-    if (!list) return;
-    let url = `/me/todo/lists/${list.id}/tasks?$top=500`;
+    let url = '/me/contacts?$select=displayName,mobilePhone,businessPhones&$top=200&$orderby=displayName';
     _contactDirectory = [];
     while (url) {
       const data = await graphFetch('GET', url);
-      for (const task of data.value || []) {
-        const f = parseBodyFields(task.body?.content);
-        if (task.title && f.PHONE) {
-          _contactDirectory.push({ name: task.title, phone: f.PHONE, email: f.EMAIL || '' });
+      for (const c of data.value || []) {
+        if (c.displayName) {
+          _contactDirectory.push({
+            name: c.displayName,
+            phone: c.mobilePhone || c.businessPhones?.[0] || '',
+          });
         }
       }
       url = data['@odata.nextLink']
         ? data['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0', '')
         : null;
     }
-    // Fill datalist for autocomplete
     const datalist = document.getElementById('contactSuggestions');
     if (datalist) {
       datalist.innerHTML = _contactDirectory
         .map(c => `<option value="${c.name.replace(/"/g, '&quot;')}">`)
         .join('');
     }
+    // If still in no-item mode, populate the picker now that contacts are loaded
+    if (!Office.context.mailbox?.item) showContactPickerSection();
   } catch {}
 }
 
 function onContactNameChange(name) {
   const match = _contactDirectory.find(c => c.name.toLowerCase() === name.toLowerCase());
-  if (match) {
+  if (match?.phone) {
     const phoneInput = document.getElementById('contactPhone');
     if (phoneInput && !phoneInput.value) phoneInput.value = match.phone;
   }
 }
 
-// ── Phone lookup via Graph contacts ──────────────────────────────────────
-async function triggerPhoneLookup() {
+// ── Phone lookup from contact directory ──────────────────────────────────
+function triggerPhoneLookup() {
   if (!_token) return;
   const phoneInput = document.getElementById('contactPhone');
   if (!phoneInput || phoneInput.value) return;
-
   const contactName = document.getElementById('contactName')?.value?.trim();
+  if (!contactName || !_contactDirectory.length) return;
+  const match = _contactDirectory.find(c => c.name.toLowerCase() === contactName.toLowerCase());
+  if (match?.phone) phoneInput.value = match.phone;
+}
 
-  // 1. Search Tembu Kontakte directory by name
-  if (contactName && _contactDirectory.length) {
-    const match = _contactDirectory.find(c => c.name.toLowerCase() === contactName.toLowerCase());
-    if (match?.phone) { phoneInput.value = match.phone; return; }
+// ── Contact picker (Ribbon-Button mode: no email/meeting context) ─────────
+function showContactPickerSection() {
+  const section = document.getElementById('contactPickerSection');
+  if (!section) return;
+  section.classList.remove('hidden');
+  renderContactPicker('');
+}
+
+function renderContactPicker(filter) {
+  const list = document.getElementById('contactPickerList');
+  if (!list) return;
+  if (!_contactDirectory.length) {
+    list.innerHTML = '<div class="rumble-empty">Kontakte werden geladen…</div>';
+    return;
   }
+  const q = filter.toLowerCase().trim();
+  const matches = q
+    ? _contactDirectory.filter(c => c.name.toLowerCase().includes(q))
+    : _contactDirectory.slice(0, 60);
+  if (!matches.length) {
+    list.innerHTML = '<div class="rumble-empty">Keine Treffer.</div>';
+    return;
+  }
+  list.innerHTML = matches.map(c =>
+    `<div class="contact-picker-row" onclick="selectContactFromPicker(${JSON.stringify(c.name)}, ${JSON.stringify(c.phone)})">
+      <span class="contact-picker-name">${escapeTp(c.name)}</span>
+      ${c.phone ? `<span class="contact-picker-phone">${escapeTp(c.phone)}</span>` : ''}
+    </div>`
+  ).join('');
+}
 
-  // 2. Fallback: search Outlook contacts by email
-  if (!_contactEmail) return;
-  try {
-    const safeEmail = _contactEmail.replace(/'/g, "''");
-    const filter = encodeURIComponent(`emailAddresses/any(e:e/address eq '${safeEmail}')`);
-    const result = await graphFetch('GET', `/me/contacts?$filter=${filter}&$select=mobilePhone,businessPhones&$top=1`);
-    const contact = result.value?.[0];
-    const phone = contact?.mobilePhone || contact?.businessPhones?.[0] || null;
-    if (phone) phoneInput.value = phone;
-  } catch {}
+function filterContactPicker(val) {
+  renderContactPicker(val);
+}
+
+function selectContactFromPicker(name, phone) {
+  document.getElementById('contactName').value = name;
+  const phoneInput = document.getElementById('contactPhone');
+  if (phoneInput) phoneInput.value = phone || '';
+  document.getElementById('contactPickerSection')?.classList.add('hidden');
+  document.getElementById('contactPickerSearch').value = '';
+  document.getElementById('rumbleText')?.focus();
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────

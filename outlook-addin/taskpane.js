@@ -419,9 +419,11 @@ function showTab(tab) {
 function updateBrowseTabLabel() {
   const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
   const isMsg  = _itemType === Office.MailboxEnums.ItemType.Message;
-  const hasCtx = (isAppt && _appointmentAttendeeNames.length) || (isMsg && _messageParticipantNames.length);
   const tabBrowse = document.getElementById('tabBrowse');
-  if (tabBrowse) tabBrowse.textContent = hasCtx ? 'Teilnehmer' : 'Alle Rumbles';
+  if (!tabBrowse) return;
+  if (isAppt && _appointmentAttendeeNames.length) tabBrowse.textContent = 'Teilnehmer';
+  else if (isMsg && _messageParticipantNames.length) tabBrowse.textContent = 'Empfänger';
+  else tabBrowse.textContent = 'Alle Rumbles';
 }
 
 function _contextParticipants() {

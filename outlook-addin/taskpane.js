@@ -15,6 +15,7 @@ let _appointmentAttendeeNames = [];
 let _allRumbles = [];
 let _rumbleLoaded = false;
 let _messageParticipantNames = [];
+let _contactDirectory = []; // { name, phone, email } from Tembu Kontakte
 
 // ── MSAL instance (silent refresh only — auth happens via dialog) ──────────
 const msalInstance = new msal.PublicClientApplication({
@@ -57,8 +58,9 @@ Office.initialize = async function () {
   }
 
   authed ? showForm() : showSignIn();
-  wireEvents();        // always wire first so buttons work even if context load fails
+  wireEvents();
   loadOutlookContext();
+  if (authed) loadContactDirectory();
 };
 
 // ── Read context from current Outlook item ────────────────────────────────
@@ -166,12 +168,60 @@ function loadOutlookContext() {
   }
 }
 
+// ── Contact directory (from Tembu Kontakte To-Do list) ───────────────────
+async function loadContactDirectory() {
+  try {
+    const lists = await graphFetch('GET', '/me/todo/lists');
+    const list = (lists.value || []).find(l => l.displayName === 'Tembu Kontakte');
+    if (!list) return;
+    let url = `/me/todo/lists/${list.id}/tasks?$top=500`;
+    _contactDirectory = [];
+    while (url) {
+      const data = await graphFetch('GET', url);
+      for (const task of data.value || []) {
+        const f = parseBodyFields(task.body?.content);
+        if (task.title && f.PHONE) {
+          _contactDirectory.push({ name: task.title, phone: f.PHONE, email: f.EMAIL || '' });
+        }
+      }
+      url = data['@odata.nextLink']
+        ? data['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0', '')
+        : null;
+    }
+    // Fill datalist for autocomplete
+    const datalist = document.getElementById('contactSuggestions');
+    if (datalist) {
+      datalist.innerHTML = _contactDirectory
+        .map(c => `<option value="${c.name.replace(/"/g, '&quot;')}">`)
+        .join('');
+    }
+  } catch {}
+}
+
+function onContactNameChange(name) {
+  const match = _contactDirectory.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (match) {
+    const phoneInput = document.getElementById('contactPhone');
+    if (phoneInput && !phoneInput.value) phoneInput.value = match.phone;
+  }
+}
+
 // ── Phone lookup via Graph contacts ──────────────────────────────────────
 async function triggerPhoneLookup() {
-  if (!_token || !_contactEmail) return;
+  if (!_token) return;
   const phoneInput = document.getElementById('contactPhone');
-  if (!phoneInput || phoneInput.value) return; // don't overwrite manual input
+  if (!phoneInput || phoneInput.value) return;
 
+  const contactName = document.getElementById('contactName')?.value?.trim();
+
+  // 1. Search Tembu Kontakte directory by name
+  if (contactName && _contactDirectory.length) {
+    const match = _contactDirectory.find(c => c.name.toLowerCase() === contactName.toLowerCase());
+    if (match?.phone) { phoneInput.value = match.phone; return; }
+  }
+
+  // 2. Fallback: search Outlook contacts by email
+  if (!_contactEmail) return;
   try {
     const safeEmail = _contactEmail.replace(/'/g, "''");
     const filter = encodeURIComponent(`emailAddresses/any(e:e/address eq '${safeEmail}')`);
@@ -532,6 +582,7 @@ function wireEvents() {
   document.getElementById('btnSignOut').addEventListener('click', signOut);
   document.getElementById('btnSave').addEventListener('click', handleSave);
   document.getElementById('btnDiag').addEventListener('click', runDiag);
+  document.getElementById('contactName').addEventListener('change', e => onContactNameChange(e.target.value));
 }
 
 function runDiag() {

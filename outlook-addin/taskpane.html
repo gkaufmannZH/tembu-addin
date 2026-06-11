@@ -181,7 +181,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v25</span></div>
+      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v26</span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
@@ -224,7 +224,8 @@
 
       <div class="field" style="margin-top:4px">
         <label>Kontakt</label>
-        <input type="text" id="contactName" placeholder="Name des Kontakts" />
+        <input type="text" id="contactName" list="contactSuggestions" placeholder="Name des Kontakts" autocomplete="off" />
+        <datalist id="contactSuggestions"></datalist>
       </div>
 
       <div class="field">
@@ -264,6 +265,6 @@
     </div>
   </div>
 
-  <script src="taskpane.js?v=20260611"></script>
+  <script src="taskpane.js?v=20260611b"></script>
 </body>
 </html>

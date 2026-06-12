@@ -189,13 +189,15 @@ async function fetchEmails(since) {
   const enc = encodeURIComponent;
   const selEmail = '$select=id,subject,receivedDateTime,sentDateTime,from,toRecipients,bodyPreview';
   const sinceDate = s.slice(0, 10);
+  let diagMode = '', diagRaw = 0, diagFiltered = 0;
   try {
     let inboxReq, sentReq;
     if (_contactEmail) {
+      diagMode = 'email-filter';
       inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${selEmail}&$top=100&$orderby=receivedDateTime desc`);
       sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${selEmail}&$top=100&$orderby=sentDateTime desc`);
     } else {
-      // Fallback: $search nach Name, dann client-seitig filtern (from/emailAddress/name ist kein OData-Filterfeld)
+      diagMode = 'name-search';
       const q = enc('"' + _contactName + '"');
       inboxReq = gFetch(`/me/messages?$search=${q}&${selEmail}&$top=100`);
       sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${q}&${selEmail}&$top=100`);
@@ -204,45 +206,67 @@ async function fetchEmails(since) {
     const result = [];
     const nameLower = _contactName.toLowerCase();
 
-    if (inbox.status === 'fulfilled') {
-      for (const m of inbox.value?.value || []) {
-        const date = (m.receivedDateTime || '').slice(0, 10);
-        if (date < sinceDate) continue;
-        // Bei Namenssuche: nur Mails wo Absender-Name den Kontakt enthält
-        if (!_contactEmail) {
-          const fromName = (m.from?.emailAddress?.name || '').toLowerCase();
-          if (!fromName.includes(nameLower)) continue;
-        }
-        result.push({ id: m.id, date, type: 'email', direction: 'received',
-          subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200),
-          fromEmail: m.from?.emailAddress?.address || '' });
-      }
-    } else if (inbox.reason?.message?.startsWith('403')) {
-      throw inbox.reason;
+    const inboxItems = inbox.status === 'fulfilled' ? (inbox.value?.value || []) : [];
+    const sentItems  = sent.status  === 'fulfilled' ? (sent.value?.value  || []) : [];
+    diagRaw = inboxItems.length + sentItems.length;
+
+    if (inbox.status === 'rejected') {
+      const err = inbox.reason?.message || '';
+      if (err.includes('403')) throw inbox.reason;
+      diagMode += ' inbox-err:' + err.slice(0, 60);
     }
-    if (sent.status === 'fulfilled') {
-      for (const m of sent.value?.value || []) {
-        const date = (m.sentDateTime || '').slice(0, 10);
-        if (date < sinceDate) continue;
-        // Bei Namenssuche: nur Mails wo ein Empfänger-Name den Kontakt enthält
-        if (!_contactEmail) {
-          const toNames = (m.toRecipients || []).map(r => (r.emailAddress?.name || '').toLowerCase());
-          if (!toNames.some(n => n.includes(nameLower))) continue;
-        }
-        result.push({ id: m.id, date, type: 'email', direction: 'sent',
-          subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200) });
-      }
+    if (sent.status === 'rejected') {
+      const err = sent.reason?.message || '';
+      diagMode += ' sent-err:' + err.slice(0, 60);
     }
 
-    // Wenn Namenssuche eine E-Mail-Adresse liefert, für künftige Suchen speichern
+    for (const m of inboxItems) {
+      const date = (m.receivedDateTime || '').slice(0, 10);
+      if (date < sinceDate) continue;
+      if (!_contactEmail) {
+        const fromName = (m.from?.emailAddress?.name || '').toLowerCase();
+        if (!fromName.includes(nameLower)) continue;
+      }
+      result.push({ id: m.id, date, type: 'email', direction: 'received',
+        subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200),
+        fromEmail: m.from?.emailAddress?.address || '',
+        fromName:  m.from?.emailAddress?.name    || '' });
+    }
+    for (const m of sentItems) {
+      const date = (m.sentDateTime || '').slice(0, 10);
+      if (date < sinceDate) continue;
+      if (!_contactEmail) {
+        const toNames = (m.toRecipients || []).map(r => (r.emailAddress?.name || '').toLowerCase());
+        if (!toNames.some(n => n.includes(nameLower))) continue;
+      }
+      result.push({ id: m.id, date, type: 'email', direction: 'sent',
+        subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200) });
+    }
+    diagFiltered = result.length;
+
     if (!_contactEmail && result.length > 0 && result[0].fromEmail) {
       _contactEmail = result[0].fromEmail;
     }
 
+    // Diagnose-Info in UI einblenden
+    showDiag(`E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
+
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {
-    throw new Error('fetchEmails: ' + e.message);
+    showDiag(`E-Mail Fehler (${diagMode}, roh:${diagRaw}): ${e.message}`);
+    throw e;
   }
+}
+
+function showDiag(msg) {
+  let el = document.getElementById('diagPanel');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'diagPanel';
+    el.style.cssText = 'font-size:10px;color:#888;background:#f8f8f8;border-top:1px solid #eee;padding:6px 20px;word-break:break-all;flex-shrink:0;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
 }
 
 // ── Fetch meetings ────────────────────────────────────────────────────────

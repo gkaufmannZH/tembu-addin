@@ -57,18 +57,21 @@ Office.initialize = async function () {
     } catch {}
   }
 
+  const pickerMode = new URLSearchParams(window.location.search).get('mode') === 'picker';
+
   authed ? showForm() : showSignIn();
   wireEvents();
-  loadOutlookContext();
-  if (authed) loadContactsFromGraph();
-
-  // When taskpane is pinned and user navigates to another item, reload context
-  try {
-    Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () {
-      resetItemContext();
-      loadOutlookContext();
-    });
-  } catch {}
+  if (!pickerMode) {
+    loadOutlookContext();
+    // When taskpane is pinned and user navigates to another item, reload context
+    try {
+      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () {
+        resetItemContext();
+        loadOutlookContext();
+      });
+    } catch {}
+  }
+  if (authed) loadContactsFromGraph(pickerMode);
 };
 
 // ── Reset per-item state (called on ItemChanged when taskpane is pinned) ──
@@ -217,7 +220,7 @@ function loadOutlookContext() {
 }
 
 // ── Contact directory (from /me/contacts) ────────────────────────────────
-async function loadContactsFromGraph() {
+async function loadContactsFromGraph(forcePickerMode) {
   try {
     let url = '/me/contacts?$select=displayName,mobilePhone,businessPhones&$top=200&$orderby=displayName';
     _contactDirectory = [];
@@ -241,11 +244,11 @@ async function loadContactsFromGraph() {
         .map(c => `<option value="${escapeTp(c.name).replace(/"/g, '&quot;')}">`)
         .join('');
     }
-    if (Office.context.mailbox?.item) {
+    if (forcePickerMode || !Office.context.mailbox?.item) {
+      showContactPickerSection();
+    } else {
       // Re-run phone lookup now that directory is populated
       triggerPhoneLookup();
-    } else {
-      showContactPickerSection();
     }
   } catch {}
 }
@@ -342,7 +345,7 @@ function startSignIn() {
             } catch {}
             showForm();
             clearStatus();
-            loadContactsFromGraph();
+            loadContactsFromGraph(new URLSearchParams(window.location.search).get('mode') === 'picker');
           } else {
             showStatus(msg.error || 'Anmeldung fehlgeschlagen.', 'error');
           }

@@ -125,11 +125,13 @@ async function loadData(force) {
       fetchRumbles(),
     ]);
   } catch (e) {
-    if (e.message?.startsWith('403')) {
-      showError('Fehlende Berechtigung: Bitte in der Taskpane abmelden und neu anmelden (Mail.Read + Calendars.Read erforderlich).');
-      return;
+    const msg = e.message || String(e);
+    if (msg.includes('403')) {
+      showError('Fehlende Berechtigung (403): Bitte in der Taskpane abmelden und neu anmelden (Mail.Read + Calendars.Read).');
+    } else {
+      showError('Fehler beim Laden: ' + msg);
     }
-    throw e;
+    return;
   }
 
   _rawData = { emails, meetings, rumbles };
@@ -239,9 +241,7 @@ async function fetchEmails(since) {
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {
-    console.warn('fetchEmails:', e.message);
-    if (e.message?.startsWith('403')) throw e;
-    return [];
+    throw new Error('fetchEmails: ' + e.message);
   }
 }
 

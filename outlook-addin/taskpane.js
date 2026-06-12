@@ -57,14 +57,10 @@ Office.initialize = async function () {
     } catch {}
   }
 
-  // picker mode only when URL requests it AND no mail/appt item is currently open
-  const pickerMode = new URLSearchParams(window.location.search).get('mode') === 'picker'
-    && !Office.context.mailbox?.item;
-
   authed ? showForm() : showSignIn();
   wireEvents();
-  if (!pickerMode) loadOutlookContext();
-  if (authed) loadContactsFromGraph(pickerMode);
+  loadOutlookContext();
+  if (authed) loadContactsFromGraph();
 
   // Always register ItemChanged so that navigating to an email with the add-in
   // already open switches to email context (even when opened in picker mode)
@@ -225,7 +221,7 @@ function loadOutlookContext() {
 }
 
 // ── Contact directory (from /me/contacts) ────────────────────────────────
-async function loadContactsFromGraph(forcePickerMode) {
+async function loadContactsFromGraph() {
   try {
     let url = '/me/contacts?$select=displayName,mobilePhone,businessPhones&$top=200&$orderby=displayName';
     _contactDirectory = [];
@@ -243,10 +239,9 @@ async function loadContactsFromGraph(forcePickerMode) {
         ? data['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0', '')
         : null;
     }
-    if (forcePickerMode || !Office.context.mailbox?.item) {
-      showContactPickerSection();
+    if (!Office.context.mailbox?.item) {
+      renderContactPicker('');
     } else {
-      // Re-run phone lookup now that directory is populated
       triggerPhoneLookup();
     }
   } catch {}
@@ -347,10 +342,7 @@ function startSignIn() {
             } catch {}
             showForm();
             clearStatus();
-            loadContactsFromGraph(
-              new URLSearchParams(window.location.search).get('mode') === 'picker'
-              && !Office.context.mailbox?.item
-            );
+            loadContactsFromGraph();
           } else {
             showStatus(msg.error || 'Anmeldung fehlgeschlagen.', 'error');
           }

@@ -46,6 +46,11 @@ function onSaveKey() {
 
 // ── Token ─────────────────────────────────────────────────────────────────
 function getStoredToken() {
+  // Outlook Desktop isoliert den Dialog-localStorage von der Taskpane → Token per URL-Parameter übergeben
+  try {
+    const t = new URLSearchParams(window.location.search).get('t');
+    if (t && t.length > 10) return t;
+  } catch {}
   try {
     const r = localStorage.getItem(DIALOG_TK_KEY);
     if (r) { const d = JSON.parse(r); if (d.exp > Date.now()) return d.token; }

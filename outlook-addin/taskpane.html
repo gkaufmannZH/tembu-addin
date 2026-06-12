@@ -174,26 +174,22 @@
     .followup-date:focus { border-color: #2d5a5a; }
     .followup-options { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
 
-    /* Contact picker (Ribbon-Button mode) */
+    /* Contact picker */
     .contact-picker-row {
       padding: 8px 11px; cursor: pointer; border-bottom: 1px solid #f0f0f0;
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
     }
     .contact-picker-row:hover { background: #f0f5f5; }
     .contact-picker-row:last-child { border-bottom: none; }
-    .contact-picker-name { font-size: 13px; color: #1a1a1a; font-weight: 500; }
-    .contact-picker-phone { font-size: 11px; color: #888; }
-
-    /* Participant picker */
-    .participant-picker-label { font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; }
-    .participant-chip {
-      display: inline-block; margin: 2px 4px 2px 0; padding: 5px 12px;
-      border: 1.5px solid #2d5a5a; border-radius: 20px; font-size: 12px;
-      color: #2d5a5a; cursor: pointer; background: none; font-family: inherit;
+    .contact-picker-name { font-size: 13px; color: #1a1a1a; font-weight: 500; flex: 1; }
+    .contact-picker-phone { font-size: 11px; color: #888; flex-shrink: 0; }
+    .context-contact { background: #f5fafa; }
+    .context-contact:hover { background: #e8f2f2; }
+    .contact-context-badge {
+      font-size: 10px; font-weight: 700; color: #2d5a5a;
+      background: #c8dada; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;
     }
-    .participant-chip:hover { background: #f0f5f5; }
-    .participant-chip.active { background: #2d5a5a; color: #fff; }
-    .participant-chip.active:hover { background: #235050; }
+    .contact-picker-divider { height: 1px; background: #e0e0e0; margin: 2px 0; }
 
     .hidden { display: none !important; }
   </style>
@@ -201,7 +197,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v38 · M1.0.3.3</span></div>
+      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v39 · M1.0.3.3</span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
@@ -253,12 +249,6 @@
         <input type="text" id="contactName" placeholder="Name des Kontakts" autocomplete="off" />
       </div>
 
-      <!-- Participant picker: shown when email/appointment has multiple people -->
-      <div id="participantPicker" class="hidden" style="margin:-6px 0 6px">
-        <div class="participant-picker-label">Für wen ist der Rumble?</div>
-        <div id="participantChips"></div>
-      </div>
-
       <div class="field">
         <label>Telefonnummer <span style="font-weight:400;opacity:0.6">(für Näherungserkennung)</span></label>
         <input type="tel" id="contactPhone" placeholder="+41 79 123 45 67" />
@@ -301,6 +291,6 @@
     </div>
   </div>
 
-  <script src="taskpane.js?v=20260617"></script>
+  <script src="taskpane.js?v=20260618"></script>
 </body>
 </html>

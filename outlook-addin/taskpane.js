@@ -16,6 +16,7 @@ let _allRumbles = [];
 let _rumbleLoaded = false;
 let _messageParticipantNames = [];
 let _contactDirectory = []; // { name, phone } from /me/contacts
+let _contextContacts = []; // { name, phone, email, label } from current mail/appt
 
 // ── MSAL instance (silent refresh only — auth happens via dialog) ──────────
 const msalInstance = new msal.PublicClientApplication({
@@ -86,9 +87,12 @@ function resetItemContext() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['participantPicker', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
+  ['briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
+  _contextContacts = [];
+  const searchEl = document.getElementById('contactPickerSearch');
+  if (searchEl) searchEl.value = '';
   const followUpCheck = document.getElementById('followUpCheck');
   if (followUpCheck) followUpCheck.checked = false;
   document.getElementById('followUpOptions')?.classList.add('hidden');
@@ -105,20 +109,18 @@ function resetItemContext() {
 // ── Read context from current Outlook item ────────────────────────────────
 function loadOutlookContext() {
   const item = Office.context.mailbox?.item;
+  _contextContacts = [];
+
   if (!item) {
-    // No email/meeting selected (Ribbon-Button mode): show contact picker
     showContactPickerSection();
     return;
   }
-  document.getElementById('contactPickerSection')?.classList.add('hidden');
 
   _itemType = item.itemType;
   const badge = document.getElementById('sourceBadge');
   const typeEl = document.getElementById('sourceType');
   const subjectEl = document.getElementById('sourceSubject');
-  const contactInput = document.getElementById('contactName');
 
-  // In read mode item.subject is a string; in compose mode it's an Office.Subject object
   function setSubject(el) {
     if (typeof item.subject === 'string') {
       el.textContent = item.subject;
@@ -139,39 +141,49 @@ function loadOutlookContext() {
     setSubject(subjectEl);
     _messageParticipantNames = [];
 
-    // Sender
+    const addMailContact = (name, email) => {
+      if (!name) return;
+      _contextContacts.push({ name, phone: '', email: email || null, label: 'Mail' });
+      _messageParticipantNames.push(name);
+    };
+
     if (typeof item.from?.displayName === 'string') {
-      contactInput.value = item.from.displayName;
-      _contactEmail = item.from.emailAddress || null;
-      if (item.from.displayName) _messageParticipantNames.push(item.from.displayName);
-      triggerPhoneLookup();
+      addMailContact(item.from.displayName, item.from.emailAddress);
+      if (Array.isArray(item.to)) {
+        item.to.forEach(r => addMailContact(r.displayName, r.emailAddress));
+      } else if (item.to?.getAsync) {
+        item.to.getAsync(r => {
+          if (r.status === Office.AsyncResultStatus.Succeeded) {
+            (r.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
+          }
+          updateBrowseTabLabel();
+          renderContactPicker('');
+        });
+      }
+      updateBrowseTabLabel();
+      showContactPickerSection();
     } else if (item.from?.getAsync) {
+      showContactPickerSection();
       item.from.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
-          contactInput.value = r.value?.displayName || '';
-          _contactEmail = r.value?.emailAddress || null;
-          if (r.value?.displayName) _messageParticipantNames.push(r.value.displayName);
+          addMailContact(r.value?.displayName, r.value?.emailAddress);
+        }
+        if (item.to?.getAsync) {
+          item.to.getAsync(toR => {
+            if (toR.status === Office.AsyncResultStatus.Succeeded) {
+              (toR.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
+            }
+            updateBrowseTabLabel();
+            renderContactPicker('');
+          });
+        } else {
           updateBrowseTabLabel();
-          showParticipantPicker(_messageParticipantNames);
-          triggerPhoneLookup();
+          renderContactPicker('');
         }
       });
+    } else {
+      showContactPickerSection();
     }
-
-    // Recipients (To)
-    if (Array.isArray(item.to)) {
-      _messageParticipantNames.push(...item.to.map(r => r.displayName).filter(Boolean));
-    } else if (item.to?.getAsync) {
-      item.to.getAsync(r => {
-        if (r.status === Office.AsyncResultStatus.Succeeded) {
-          _messageParticipantNames.push(...(r.value || []).map(a => a.displayName).filter(Boolean));
-          updateBrowseTabLabel();
-          showParticipantPicker(_messageParticipantNames);
-        }
-      });
-    }
-    updateBrowseTabLabel();
-    showParticipantPicker(_messageParticipantNames);
 
     try {
       const restId = Office.context.mailbox.convertToRestId(item.itemId, Office.MailboxEnums.RestVersion.v2_0);
@@ -182,35 +194,32 @@ function loadOutlookContext() {
     typeEl.textContent = 'Termin';
     badge.classList.remove('hidden');
     setSubject(subjectEl);
+    _appointmentAttendeeNames = [];
 
-    // Read mode: attendees are plain arrays; compose mode: Office.Recipients objects with getAsync()
+    const addApptContact = (name, email) => {
+      if (!name) return;
+      _contextContacts.push({ name, phone: '', email: email || null, label: 'Termin' });
+      _appointmentAttendeeNames.push(name);
+    };
+
     if (Array.isArray(item.requiredAttendees)) {
       const all = [...(item.requiredAttendees || []), ...(item.optionalAttendees || [])];
-      _appointmentAttendeeNames = all.map(a => a.displayName).filter(Boolean);
+      all.forEach(a => addApptContact(a.displayName, a.emailAddress));
       updateBrowseTabLabel();
-      const first = all.find(a => a.displayName);
-      if (first) {
-        contactInput.value = first.displayName;
-        _contactEmail = first.emailAddress || null;
-        triggerPhoneLookup();
-      }
-      showParticipantPicker(_appointmentAttendeeNames);
+      showContactPickerSection();
       if (_token) loadMeetingBriefing();
     } else if (item.requiredAttendees?.getAsync) {
+      showContactPickerSection();
       item.requiredAttendees.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
-          _appointmentAttendeeNames = (r.value || []).map(a => a.displayName).filter(Boolean);
-          updateBrowseTabLabel();
-          const first = (r.value || []).find(a => a.displayName);
-          if (first) {
-            contactInput.value = first.displayName;
-            _contactEmail = first.emailAddress || null;
-            triggerPhoneLookup();
-          }
-          showParticipantPicker(_appointmentAttendeeNames);
-          if (_token) loadMeetingBriefing();
+          (r.value || []).forEach(a => addApptContact(a.displayName, a.emailAddress));
         }
+        updateBrowseTabLabel();
+        renderContactPicker('');
+        if (_token) loadMeetingBriefing();
       });
+    } else {
+      showContactPickerSection();
     }
 
     try {
@@ -239,11 +248,14 @@ async function loadContactsFromGraph() {
         ? data['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0', '')
         : null;
     }
-    if (!Office.context.mailbox?.item) {
-      renderContactPicker('');
-    } else {
-      triggerPhoneLookup();
-    }
+    // Enrich context contacts with phone numbers from directory
+    _contextContacts.forEach(c => {
+      if (!c.phone) {
+        const match = _contactDirectory.find(d => d.name.toLowerCase() === c.name.toLowerCase());
+        if (match?.phone) c.phone = match.phone;
+      }
+    });
+    renderContactPicker('');
   } catch {}
 }
 
@@ -277,26 +289,49 @@ function showContactPickerSection() {
 function renderContactPicker(filter) {
   const list = document.getElementById('contactPickerList');
   if (!list) return;
-  if (!_contactDirectory.length) {
-    list.innerHTML = '<div class="rumble-empty">Kontakte werden geladen…</div>';
-    return;
-  }
+
   const q = filter.toLowerCase().trim();
-  const matches = q
-    ? _contactDirectory.filter(c => c.name.toLowerCase().includes(q))
-    : _contactDirectory;
-  if (!matches.length) {
-    list.innerHTML = '<div class="rumble-empty">Keine Treffer.</div>';
-    return;
+  const hasContext = !q && _contextContacts.length > 0;
+  let html = '';
+
+  if (hasContext) {
+    html += _contextContacts.map(c =>
+      `<div class="contact-picker-row context-contact"
+        data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}"
+        data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}"
+        data-email="${escapeTp(c.email || '').replace(/"/g, '&quot;')}">
+        <span class="contact-picker-name">${escapeTp(c.name)}</span>
+        <span class="contact-context-badge">${escapeTp(c.label)}</span>
+      </div>`
+    ).join('');
+    html += '<div class="contact-picker-divider"></div>';
   }
-  list.innerHTML = matches.map(c =>
-    `<div class="contact-picker-row" data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}" data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}">
-      <span class="contact-picker-name">${escapeTp(c.name)}</span>
-      ${c.phone ? `<span class="contact-picker-phone">${escapeTp(c.phone)}</span>` : ''}
-    </div>`
-  ).join('');
+
+  if (!_contactDirectory.length) {
+    if (!hasContext) html += '<div class="rumble-empty">Kontakte werden geladen…</div>';
+  } else {
+    const matches = q
+      ? _contactDirectory.filter(c => c.name.toLowerCase().includes(q))
+      : _contactDirectory;
+    if (!matches.length && !hasContext) {
+      list.innerHTML = '<div class="rumble-empty">Keine Treffer.</div>';
+      return;
+    }
+    html += matches.map(c =>
+      `<div class="contact-picker-row"
+        data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}"
+        data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}">
+        <span class="contact-picker-name">${escapeTp(c.name)}</span>
+        ${c.phone ? `<span class="contact-picker-phone">${escapeTp(c.phone)}</span>` : ''}
+      </div>`
+    ).join('');
+  }
+
+  list.innerHTML = html;
   list.querySelectorAll('.contact-picker-row').forEach(row => {
-    row.addEventListener('click', () => selectContactFromPicker(row.dataset.name, row.dataset.phone));
+    row.addEventListener('click', () =>
+      selectContactFromPicker(row.dataset.name, row.dataset.phone, row.dataset.email)
+    );
   });
 }
 
@@ -304,10 +339,11 @@ function filterContactPicker(val) {
   renderContactPicker(val);
 }
 
-function selectContactFromPicker(name, phone) {
+function selectContactFromPicker(name, phone, email) {
   document.getElementById('contactName').value = name;
   const phoneInput = document.getElementById('contactPhone');
   if (phoneInput) phoneInput.value = phone || '';
+  _contactEmail = email || null;
   document.getElementById('contactPickerSection')?.classList.add('hidden');
   const searchEl = document.getElementById('contactPickerSearch');
   if (searchEl) searchEl.value = '';
@@ -579,33 +615,6 @@ function updateBrowseTabLabel() {
   if (isAppt && _appointmentAttendeeNames.length) tabBrowse.textContent = 'Teilnehmer';
   else if (isMsg && _messageParticipantNames.length) tabBrowse.textContent = 'Empfänger';
   else tabBrowse.textContent = 'Alle Rumbles';
-}
-
-// ── Participant picker ────────────────────────────────────────────────────
-function showParticipantPicker(names) {
-  const picker = document.getElementById('participantPicker');
-  const chips  = document.getElementById('participantChips');
-  if (!picker || !chips) return;
-  const unique = [...new Set(names)].filter(Boolean);
-  if (unique.length <= 1) { picker.classList.add('hidden'); return; }
-
-  const current = document.getElementById('contactName')?.value || '';
-  chips.innerHTML = unique.map(name => {
-    const active = name.toLowerCase() === current.toLowerCase() ? ' active' : '';
-    return `<button class="participant-chip${active}" onclick="selectParticipant(${JSON.stringify(name)})">${escapeTp(name)}</button>`;
-  }).join('');
-  picker.classList.remove('hidden');
-}
-
-function selectParticipant(name) {
-  const contactInput = document.getElementById('contactName');
-  if (contactInput) contactInput.value = name;
-  document.querySelectorAll('.participant-chip').forEach(c => {
-    c.classList.toggle('active', c.textContent === name);
-  });
-  const phoneInput = document.getElementById('contactPhone');
-  if (phoneInput) phoneInput.value = '';
-  triggerPhoneLookup();
 }
 
 function _contextParticipants() {

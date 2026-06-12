@@ -60,8 +60,6 @@ Office.initialize = async function () {
 
   authed ? showForm() : showSignIn();
   wireEvents();
-  const _initItem = Office.context.mailbox?.item;
-  setContextIndicator(`Init: item=${_initItem ? _initItem.itemType ?? 'set' : 'null'} · url=${window.location.search || '(none)'}`);
   loadOutlookContext();
   if (authed) loadContactsFromGraph();
 
@@ -119,13 +117,11 @@ function loadOutlookContext() {
   const item = Office.context.mailbox?.item;
   _contextContacts = [];
 
-  if (!item) {
-    setContextIndicator('Quelle: Hauptansicht (kein Item)');
-    showContactPickerSection();
-    return;
-  }
+  // Always show picker — Outlook always has a mail selected, so item is never
+  // a reliable signal for "user is actively reading this mail vs just browsing"
+  showContactPickerSection();
 
-  document.getElementById('contactPickerSection')?.classList.add('hidden');
+  if (!item) return;
 
   _itemType = item.itemType;
   const badge = document.getElementById('sourceBadge');
@@ -146,12 +142,9 @@ function loadOutlookContext() {
     }
   }
 
-  const contactInput = document.getElementById('contactName');
-
   if (item.itemType === Office.MailboxEnums.ItemType.Message) {
-    setContextIndicator(`Quelle: Mail · item.itemId=${item.itemId?.slice(-8) ?? '?'}`);
     typeEl.textContent = 'E-Mail';
-    badge.classList.remove('hidden');
+    badge?.classList.remove('hidden');
     setSubject(subjectEl);
     _messageParticipantNames = [];
 
@@ -163,8 +156,6 @@ function loadOutlookContext() {
 
     if (typeof item.from?.displayName === 'string') {
       addMailContact(item.from.displayName, item.from.emailAddress);
-      contactInput.value = item.from.displayName;
-      _contactEmail = item.from.emailAddress || null;
       if (Array.isArray(item.to)) {
         item.to.forEach(r => addMailContact(r.displayName, r.emailAddress));
       } else if (item.to?.getAsync) {
@@ -173,18 +164,15 @@ function loadOutlookContext() {
             (r.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
           }
           updateBrowseTabLabel();
-          showParticipantPicker(_messageParticipantNames);
+          renderContactPicker('');
         });
       }
       updateBrowseTabLabel();
-      showParticipantPicker(_messageParticipantNames);
-      triggerPhoneLookup();
+      renderContactPicker('');
     } else if (item.from?.getAsync) {
       item.from.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           addMailContact(r.value?.displayName, r.value?.emailAddress);
-          contactInput.value = r.value?.displayName || '';
-          _contactEmail = r.value?.emailAddress || null;
         }
         if (item.to?.getAsync) {
           item.to.getAsync(toR => {
@@ -192,13 +180,11 @@ function loadOutlookContext() {
               (toR.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
             }
             updateBrowseTabLabel();
-            showParticipantPicker(_messageParticipantNames);
-            triggerPhoneLookup();
+            renderContactPicker('');
           });
         } else {
           updateBrowseTabLabel();
-          showParticipantPicker(_messageParticipantNames);
-          triggerPhoneLookup();
+          renderContactPicker('');
         }
       });
     }
@@ -209,9 +195,8 @@ function loadOutlookContext() {
     } catch {}
 
   } else if (item.itemType === Office.MailboxEnums.ItemType.Appointment) {
-    setContextIndicator(`Quelle: Termin · item.itemId=${item.itemId?.slice(-8) ?? '?'}`);
     typeEl.textContent = 'Termin';
-    badge.classList.remove('hidden');
+    badge?.classList.remove('hidden');
     setSubject(subjectEl);
     _appointmentAttendeeNames = [];
 
@@ -226,10 +211,7 @@ function loadOutlookContext() {
       all.forEach(a => addApptContact(a.displayName, a.emailAddress));
       _appointmentAttendeeNames = all.map(a => a.displayName).filter(Boolean);
       updateBrowseTabLabel();
-      const first = all.find(a => a.displayName);
-      if (first) { contactInput.value = first.displayName; _contactEmail = first.emailAddress || null; }
-      showParticipantPicker(_appointmentAttendeeNames);
-      triggerPhoneLookup();
+      renderContactPicker('');
       if (_token) loadMeetingBriefing();
     } else if (item.requiredAttendees?.getAsync) {
       item.requiredAttendees.getAsync(r => {
@@ -237,10 +219,7 @@ function loadOutlookContext() {
           (r.value || []).forEach(a => addApptContact(a.displayName, a.emailAddress));
           _appointmentAttendeeNames = (r.value || []).map(a => a.displayName).filter(Boolean);
           updateBrowseTabLabel();
-          const first = (r.value || []).find(a => a.displayName);
-          if (first) { contactInput.value = first.displayName; _contactEmail = first.emailAddress || null; }
-          showParticipantPicker(_appointmentAttendeeNames);
-          triggerPhoneLookup();
+          renderContactPicker('');
           if (_token) loadMeetingBriefing();
         }
       });

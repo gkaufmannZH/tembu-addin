@@ -61,17 +61,17 @@ Office.initialize = async function () {
 
   authed ? showForm() : showSignIn();
   wireEvents();
-  if (!pickerMode) {
-    loadOutlookContext();
-    // When taskpane is pinned and user navigates to another item, reload context
-    try {
-      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () {
-        resetItemContext();
-        loadOutlookContext();
-      });
-    } catch {}
-  }
+  if (!pickerMode) loadOutlookContext();
   if (authed) loadContactsFromGraph(pickerMode);
+
+  // Always register ItemChanged so that navigating to an email with the add-in
+  // already open switches to email context (even when opened in picker mode)
+  try {
+    Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () {
+      resetItemContext();
+      loadOutlookContext();
+    });
+  } catch {}
 };
 
 // ── Reset per-item state (called on ItemChanged when taskpane is pinned) ──

@@ -117,11 +117,20 @@ async function loadData(force) {
     : new Date(Date.now() - SINCE_MS);
 
   setLoading('E-Mails und Termine werden geladen…');
-  const [emails, meetings, rumbles] = await Promise.all([
-    fetchEmails(since),
-    fetchMeetings(since),
-    fetchRumbles(),
-  ]);
+  let emails = [], meetings = [], rumbles = [];
+  try {
+    [emails, meetings, rumbles] = await Promise.all([
+      fetchEmails(since),
+      fetchMeetings(since),
+      fetchRumbles(),
+    ]);
+  } catch (e) {
+    if (e.message?.startsWith('403')) {
+      showError('Fehlende Berechtigung: Bitte in der Taskpane abmelden und neu anmelden (Mail.Read + Calendars.Read erforderlich).');
+      return;
+    }
+    throw e;
+  }
 
   _rawData = { emails, meetings, rumbles };
 
@@ -173,30 +182,47 @@ async function gFetch(path) {
 
 // ── Fetch emails ──────────────────────────────────────────────────────────
 async function fetchEmails(since) {
-  if (!_contactEmail) return [];
+  if (!_contactEmail && !_contactName) return [];
   const s   = since.toISOString();
   const enc = encodeURIComponent;
   const sel = '$select=id,subject,receivedDateTime,sentDateTime,from,bodyPreview';
   try {
-    const [inbox, sent] = await Promise.allSettled([
-      gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${sel}&$top=100&$orderby=receivedDateTime desc`),
-      gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${sel}&$top=100&$orderby=sentDateTime desc`),
-    ]);
+    let inboxReq, sentReq;
+    if (_contactEmail) {
+      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${sel}&$top=100&$orderby=receivedDateTime desc`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${sel}&$top=100&$orderby=sentDateTime desc`);
+    } else {
+      // Fallback: Namenssuche wenn keine E-Mail-Adresse bekannt
+      inboxReq = gFetch(`/me/messages?$search=${enc('"from:' + _contactName + '"')}&${sel}&$top=100`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${enc('"to:' + _contactName + '"')}&${sel}&$top=100`);
+    }
+    const [inbox, sent] = await Promise.allSettled([inboxReq, sentReq]);
+    const sinceDate = s.slice(0, 10);
     const result = [];
     if (inbox.status === 'fulfilled') {
-      for (const m of inbox.value?.value || []) result.push({
-        id: m.id, date: (m.receivedDateTime || '').slice(0, 10), type: 'email', direction: 'received',
-        subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200),
-      });
+      for (const m of inbox.value?.value || []) {
+        const date = (m.receivedDateTime || '').slice(0, 10);
+        if (date < sinceDate) continue;
+        result.push({ id: m.id, date, type: 'email', direction: 'received',
+          subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200) });
+      }
+    } else if (inbox.reason?.message?.startsWith('403')) {
+      throw inbox.reason;
     }
     if (sent.status === 'fulfilled') {
-      for (const m of sent.value?.value || []) result.push({
-        id: m.id, date: (m.sentDateTime || '').slice(0, 10), type: 'email', direction: 'sent',
-        subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200),
-      });
+      for (const m of sent.value?.value || []) {
+        const date = (m.sentDateTime || '').slice(0, 10);
+        if (date < sinceDate) continue;
+        result.push({ id: m.id, date, type: 'email', direction: 'sent',
+          subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200) });
+      }
     }
     return result.sort((a, b) => b.date.localeCompare(a.date));
-  } catch (e) { console.warn('fetchEmails:', e.message); return []; }
+  } catch (e) {
+    console.warn('fetchEmails:', e.message);
+    if (e.message?.startsWith('403')) throw e; // 403 nach oben propagieren
+    return [];
+  }
 }
 
 // ── Fetch meetings ────────────────────────────────────────────────────────

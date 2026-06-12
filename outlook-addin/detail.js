@@ -200,13 +200,16 @@ async function fetchEmails(since) {
       sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${qTo}&${selEmail}&$top=100`);
     } else {
       diagMode = 'name-search';
-      const q = enc('"' + _contactName + '"');
+      const cleanName = _contactName.replace(/^(Herr|Frau|Hr\.|Fr\.|Dr\.|Prof\.|Ing\.|Mag\.)\s+/i, '').trim();
+      const q = enc('"' + cleanName + '"');
       inboxReq = gFetch(`/me/messages?$search=${q}&${selEmail}&$top=100`);
       sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${q}&${selEmail}&$top=100`);
     }
     const [inbox, sent] = await Promise.allSettled([inboxReq, sentReq]);
     const result = [];
-    const nameLower = _contactName.toLowerCase();
+    // Anrede-Präfixe entfernen (Herr/Frau/Dr./Prof. etc.) für zuverlässigeren Namensvergleich
+    const nameLower = _contactName.toLowerCase()
+      .replace(/^(herr|frau|hr\.|fr\.|dr\.|prof\.|ing\.|mag\.|dipl\.|lic\.)\s+/gi, '').trim();
 
     const inboxItems = inbox.status === 'fulfilled' ? (inbox.value?.value || []) : [];
     const sentItems  = sent.status  === 'fulfilled' ? (sent.value?.value  || []) : [];
@@ -251,7 +254,7 @@ async function fetchEmails(since) {
     }
 
     // Diagnose-Info in UI einblenden
-    showDiag(`js:20260623 | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
+    showDiag(`js:20260624 | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {

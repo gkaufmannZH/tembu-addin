@@ -33,7 +33,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260623" />
+        <SourceLocation DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260624" />
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -117,8 +117,8 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Commands.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260623?mode=picker" />
-        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260623" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260624?mode=picker" />
+        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260624" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Tembu" />
@@ -224,8 +224,8 @@
         </bt:Images>
         <bt:Urls>
           <bt:Url id="Commands.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/commands.html" />
-          <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260623?mode=picker" />
-          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260623" />
+          <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260624?mode=picker" />
+          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?v=20260624" />
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Tembu" />

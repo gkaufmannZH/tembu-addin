@@ -254,7 +254,7 @@ async function fetchEmails(since) {
     }
 
     // Diagnose-Info in UI einblenden
-    showDiag(`js:20260626 | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
+    showDiag(`js:20260627 | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {
@@ -344,6 +344,7 @@ async function runAI(data) {
   try {
     const raw    = await callAI(buildPrompt(data), apiKey);
     const parsed = parseAIResponse(raw);
+    showDiag(document.getElementById('diagPanel')?.textContent + ` | KI: ${raw.length}ch themes:${parsed.themes?.length ?? '?'} raw:${raw.slice(0, 80).replace(/\n/g, ' ')}`);
     renderAiAnalysis(parsed);
     renderThemes(parsed.themes || []);
     renderBackground(parsed.background || '');
@@ -353,11 +354,13 @@ async function runAI(data) {
     document.getElementById('cacheInfo').classList.remove('hidden');
   } catch (e) {
     showContent();
+    const errMsg = String(e.message || e);
+    showDiag((document.getElementById('diagPanel')?.textContent || '') + ` | KI-Fehler: ${errMsg.slice(0, 100)}`);
+    const noKeyBox = document.getElementById('noKeyBox');
     const desc = document.getElementById('noKeyDesc');
-    if (desc) desc.innerHTML = 'Fehler: ' + esc(String(e.message || e)) + '<br/><br/>Tipp: Gemini-Konto braucht Guthaben &gt; CHF 0 oder nutze einen anderen Key.';
-    document.getElementById('noKeyBox').classList.remove('hidden');
-    renderThemesEmpty('Analyse fehlgeschlagen. Fehler siehe Zeitachse.');
-    document.getElementById('noKeyDesc').textContent = `Fehler: ${e.message}. Bitte API-Key prüfen.`;
+    if (desc) desc.innerHTML = 'Fehler: ' + esc(errMsg) + '<br/><br/>Tipp: Gemini-Konto braucht Guthaben &gt; CHF 0 oder nutze einen anderen Key.';
+    if (noKeyBox) noKeyBox.classList.remove('hidden');
+    renderThemesEmpty('Analyse fehlgeschlagen — Fehler in Diagnose-Leiste (unten).');
   }
 }
 
@@ -383,10 +386,10 @@ ${eLines ? `E-MAILS:\n${eLines}\n\n` : ''}${mLines ? `MEETINGS:\n${mLines}\n\n` 
   "summary": "2-3 Sätze zur Beziehung, Häufigkeit, Ton",
   "sentiment": "positiv|neutral|negativ",
   "openPoints": ["Offener Punkt 1", "Offener Punkt 2"],
-  "nextStep": "Konkrete Empfehlung für nächstes Gespräch",
   "themes": [
     { "name": "Thema", "count": 3, "status": "offen|abgeschlossen", "summary": "Kurzbeschreibung" }
   ],
+  "nextStep": "Konkrete Empfehlung für nächstes Gespräch",
   "background": "Öffentlich bekannte Infos zu ${_contactName}: Beruf, Unternehmen, Branche. Falls unbekannt: leer lassen."
 }`;
 }
@@ -422,11 +425,13 @@ async function callGemini(prompt, apiKey) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } } }) }
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 8192 } }) }
   );
   if (!res.ok) { const t = await res.text(); throw new Error(`Gemini ${res.status}: ${t.slice(0, 120)}`); }
   const d = await res.json();
-  return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const parts = d.candidates?.[0]?.content?.parts || [];
+  const text = parts.filter(p => !p.thought).map(p => p.text || '').join('');
+  return text;
 }
 
 async function callAnthropic(prompt, apiKey) {

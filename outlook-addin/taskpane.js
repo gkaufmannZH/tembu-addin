@@ -2,7 +2,7 @@
 
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const AUTH_URL     = 'https://gkaufmannzh.github.io/tembu.app/outlook-addin/auth.html';
-const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read'];
+const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read'];
 const TEMBU_LIST   = 'Tembu';
 const SESSION_KEY  = '@tembu_outlook_session';
 
@@ -87,6 +87,7 @@ function resetItemContext() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  document.getElementById('btnOpenDetail')?.classList.add('hidden');
   ['participantPicker', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
@@ -350,6 +351,7 @@ function selectContactFromPicker(name, phone, email) {
   document.getElementById('contactPickerSection')?.classList.add('hidden');
   const searchEl = document.getElementById('contactPickerSearch');
   if (searchEl) searchEl.value = '';
+  document.getElementById('btnOpenDetail')?.classList.remove('hidden');
   document.getElementById('rumbleText')?.focus();
 }
 
@@ -753,6 +755,30 @@ function wireEvents() {
   document.getElementById('btnSave').addEventListener('click', handleSave);
   document.getElementById('btnDiag').addEventListener('click', runDiag);
   document.getElementById('contactName').addEventListener('change', e => onContactNameChange(e.target.value));
+}
+
+// ── Contact Intelligence Detail Dialog ───────────────────────────────────
+function openDetailDialog() {
+  const contactName = document.getElementById('contactName')?.value?.trim();
+  if (!contactName) { showStatus('Bitte zuerst einen Kontakt auswählen.', 'error'); return; }
+
+  try {
+    localStorage.setItem('@tembu_dialog_token', JSON.stringify({
+      token: _token,
+      exp: Date.now() + 10 * 60 * 1000,
+    }));
+  } catch {}
+
+  const params = new URLSearchParams({ name: contactName, email: _contactEmail || '' });
+  const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/detail.html?${params.toString()}`;
+
+  Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
+    result => {
+      if (result.status === Office.AsyncResultStatus.Failed) {
+        showStatus('Detail-Fenster konnte nicht geöffnet werden.', 'error');
+      }
+    }
+  );
 }
 
 function runDiag() {

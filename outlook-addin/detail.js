@@ -112,10 +112,8 @@ async function loadData(force) {
   setLoading('Daten werden geladen…');
 
   const cached = await getCached(_cacheKey);
-  // Since-Datum: immer mindestens SINCE_MS zurück; Cache-Datum nur wenn bereits Emails vorhanden
-  const since  = (cached && !force && cached.rawData?.emails?.length > 0)
-    ? new Date(Math.min(cached.cachedAt - 60 * 60 * 1000, Date.now() - 30 * 24 * 60 * 60 * 1000))
-    : new Date(Date.now() - SINCE_MS);
+  // Since-Datum: immer 2 Jahre zurück (SINCE_MS) — $search braucht ohnehin client-seitigen Datumsfilter
+  const since = new Date(Date.now() - SINCE_MS);
 
   setLoading('E-Mails und Termine werden geladen…');
   let emails = [], meetings = [], rumbles = [];
@@ -352,7 +350,10 @@ async function runAI(data) {
     document.getElementById('cacheInfo').classList.remove('hidden');
   } catch (e) {
     showContent();
+    const desc = document.getElementById('noKeyDesc');
+    if (desc) desc.innerHTML = 'Fehler: ' + esc(String(e.message || e)) + '<br/><br/>Tipp: Gemini-Konto braucht Guthaben &gt; CHF 0 oder nutze einen anderen Key.';
     document.getElementById('noKeyBox').classList.remove('hidden');
+    renderThemesEmpty('Analyse fehlgeschlagen. Fehler siehe Zeitachse.');
     document.getElementById('noKeyDesc').textContent = `Fehler: ${e.message}. Bitte API-Key prüfen.`;
   }
 }
@@ -570,9 +571,12 @@ function renderThemes(themes) {
   }).join('');
 }
 
-function renderThemesEmpty() {
-  document.getElementById('themesContent').innerHTML =
-    '<div class="empty-state">Kein KI-Key eingetragen.<br/>Gib oben einen API-Key ein um Themen zu erkennen.</div>';
+function renderThemesEmpty(msg) {
+  const hasKey = !!getApiKey();
+  const text = msg || (hasKey
+    ? 'Keine Themen gefunden.<br/>Drücke OK um die Analyse neu zu starten.'
+    : 'Kein KI-Key eingetragen.<br/>Gib oben einen API-Key ein um Themen zu erkennen.');
+  document.getElementById('themesContent').innerHTML = `<div class="empty-state">${text}</div>`;
 }
 
 function renderBackground(text) {

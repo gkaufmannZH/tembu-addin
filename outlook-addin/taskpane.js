@@ -89,7 +89,7 @@ function resetItemContext() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
+  ['participantPicker', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
   _contextContacts = [];
@@ -125,6 +125,8 @@ function loadOutlookContext() {
     return;
   }
 
+  document.getElementById('contactPickerSection')?.classList.add('hidden');
+
   _itemType = item.itemType;
   const badge = document.getElementById('sourceBadge');
   const typeEl = document.getElementById('sourceType');
@@ -144,6 +146,8 @@ function loadOutlookContext() {
     }
   }
 
+  const contactInput = document.getElementById('contactName');
+
   if (item.itemType === Office.MailboxEnums.ItemType.Message) {
     setContextIndicator(`Quelle: Mail · item.itemId=${item.itemId?.slice(-8) ?? '?'}`);
     typeEl.textContent = 'E-Mail';
@@ -159,6 +163,8 @@ function loadOutlookContext() {
 
     if (typeof item.from?.displayName === 'string') {
       addMailContact(item.from.displayName, item.from.emailAddress);
+      contactInput.value = item.from.displayName;
+      _contactEmail = item.from.emailAddress || null;
       if (Array.isArray(item.to)) {
         item.to.forEach(r => addMailContact(r.displayName, r.emailAddress));
       } else if (item.to?.getAsync) {
@@ -167,16 +173,18 @@ function loadOutlookContext() {
             (r.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
           }
           updateBrowseTabLabel();
-          renderContactPicker('');
+          showParticipantPicker(_messageParticipantNames);
         });
       }
       updateBrowseTabLabel();
-      showContactPickerSection();
+      showParticipantPicker(_messageParticipantNames);
+      triggerPhoneLookup();
     } else if (item.from?.getAsync) {
-      showContactPickerSection();
       item.from.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           addMailContact(r.value?.displayName, r.value?.emailAddress);
+          contactInput.value = r.value?.displayName || '';
+          _contactEmail = r.value?.emailAddress || null;
         }
         if (item.to?.getAsync) {
           item.to.getAsync(toR => {
@@ -184,15 +192,15 @@ function loadOutlookContext() {
               (toR.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
             }
             updateBrowseTabLabel();
-            renderContactPicker('');
+            showParticipantPicker(_messageParticipantNames);
+            triggerPhoneLookup();
           });
         } else {
           updateBrowseTabLabel();
-          renderContactPicker('');
+          showParticipantPicker(_messageParticipantNames);
+          triggerPhoneLookup();
         }
       });
-    } else {
-      showContactPickerSection();
     }
 
     try {
@@ -216,21 +224,26 @@ function loadOutlookContext() {
     if (Array.isArray(item.requiredAttendees)) {
       const all = [...(item.requiredAttendees || []), ...(item.optionalAttendees || [])];
       all.forEach(a => addApptContact(a.displayName, a.emailAddress));
+      _appointmentAttendeeNames = all.map(a => a.displayName).filter(Boolean);
       updateBrowseTabLabel();
-      showContactPickerSection();
+      const first = all.find(a => a.displayName);
+      if (first) { contactInput.value = first.displayName; _contactEmail = first.emailAddress || null; }
+      showParticipantPicker(_appointmentAttendeeNames);
+      triggerPhoneLookup();
       if (_token) loadMeetingBriefing();
     } else if (item.requiredAttendees?.getAsync) {
-      showContactPickerSection();
       item.requiredAttendees.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           (r.value || []).forEach(a => addApptContact(a.displayName, a.emailAddress));
+          _appointmentAttendeeNames = (r.value || []).map(a => a.displayName).filter(Boolean);
+          updateBrowseTabLabel();
+          const first = (r.value || []).find(a => a.displayName);
+          if (first) { contactInput.value = first.displayName; _contactEmail = first.emailAddress || null; }
+          showParticipantPicker(_appointmentAttendeeNames);
+          triggerPhoneLookup();
+          if (_token) loadMeetingBriefing();
         }
-        updateBrowseTabLabel();
-        renderContactPicker('');
-        if (_token) loadMeetingBriefing();
       });
-    } else {
-      showContactPickerSection();
     }
 
     try {
@@ -626,6 +639,34 @@ function updateBrowseTabLabel() {
   if (isAppt && _appointmentAttendeeNames.length) tabBrowse.textContent = 'Teilnehmer';
   else if (isMsg && _messageParticipantNames.length) tabBrowse.textContent = 'Empfänger';
   else tabBrowse.textContent = 'Alle Rumbles';
+}
+
+// ── Participant picker ────────────────────────────────────────────────────
+function showParticipantPicker(names) {
+  const picker = document.getElementById('participantPicker');
+  const chips  = document.getElementById('participantChips');
+  if (!picker || !chips) return;
+  const unique = [...new Set(names)].filter(Boolean);
+  if (unique.length <= 1) { picker.classList.add('hidden'); return; }
+  const current = document.getElementById('contactName')?.value || '';
+  chips.innerHTML = unique.map(name => {
+    const active = name.toLowerCase() === current.toLowerCase() ? ' active' : '';
+    return `<button class="participant-chip${active}" onclick="selectParticipant(${JSON.stringify(name)})">${escapeTp(name)}</button>`;
+  }).join('');
+  picker.classList.remove('hidden');
+}
+
+function selectParticipant(name) {
+  const contactInput = document.getElementById('contactName');
+  if (contactInput) contactInput.value = name;
+  // update email from _contextContacts
+  const ctx = _contextContacts.find(c => c.name === name);
+  _contactEmail = ctx?.email || null;
+  document.querySelectorAll('.participant-chip').forEach(c => {
+    c.classList.toggle('active', c.textContent === name);
+  });
+  document.getElementById('contactPhone').value = '';
+  triggerPhoneLookup();
 }
 
 function _contextParticipants() {

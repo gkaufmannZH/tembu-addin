@@ -185,26 +185,35 @@ async function fetchEmails(since) {
   if (!_contactEmail && !_contactName) return [];
   const s   = since.toISOString();
   const enc = encodeURIComponent;
-  const sel = '$select=id,subject,receivedDateTime,sentDateTime,from,bodyPreview';
+  const selEmail = '$select=id,subject,receivedDateTime,sentDateTime,from,toRecipients,bodyPreview';
+  const sinceDate = s.slice(0, 10);
   try {
     let inboxReq, sentReq;
     if (_contactEmail) {
-      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${sel}&$top=100&$orderby=receivedDateTime desc`);
-      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${sel}&$top=100&$orderby=sentDateTime desc`);
+      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${selEmail}&$top=100&$orderby=receivedDateTime desc`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${selEmail}&$top=100&$orderby=sentDateTime desc`);
     } else {
-      // Fallback: Filter nach Anzeigename wenn keine E-Mail-Adresse bekannt
-      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/name eq '${_contactName}' and receivedDateTime ge ${s}`)}&${sel}&$top=100&$orderby=receivedDateTime desc`);
-      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/name eq '${_contactName}') and sentDateTime ge ${s}`)}&${sel}&$top=100&$orderby=sentDateTime desc`);
+      // Fallback: $search nach Name, dann client-seitig filtern (from/emailAddress/name ist kein OData-Filterfeld)
+      const q = enc('"' + _contactName + '"');
+      inboxReq = gFetch(`/me/messages?$search=${q}&${selEmail}&$top=100`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${q}&${selEmail}&$top=100`);
     }
     const [inbox, sent] = await Promise.allSettled([inboxReq, sentReq]);
-    const sinceDate = s.slice(0, 10);
     const result = [];
+    const nameLower = _contactName.toLowerCase();
+
     if (inbox.status === 'fulfilled') {
       for (const m of inbox.value?.value || []) {
         const date = (m.receivedDateTime || '').slice(0, 10);
         if (date < sinceDate) continue;
+        // Bei Namenssuche: nur Mails wo Absender-Name den Kontakt enthält
+        if (!_contactEmail) {
+          const fromName = (m.from?.emailAddress?.name || '').toLowerCase();
+          if (!fromName.includes(nameLower)) continue;
+        }
         result.push({ id: m.id, date, type: 'email', direction: 'received',
-          subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200) });
+          subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200),
+          fromEmail: m.from?.emailAddress?.address || '' });
       }
     } else if (inbox.reason?.message?.startsWith('403')) {
       throw inbox.reason;
@@ -213,14 +222,25 @@ async function fetchEmails(since) {
       for (const m of sent.value?.value || []) {
         const date = (m.sentDateTime || '').slice(0, 10);
         if (date < sinceDate) continue;
+        // Bei Namenssuche: nur Mails wo ein Empfänger-Name den Kontakt enthält
+        if (!_contactEmail) {
+          const toNames = (m.toRecipients || []).map(r => (r.emailAddress?.name || '').toLowerCase());
+          if (!toNames.some(n => n.includes(nameLower))) continue;
+        }
         result.push({ id: m.id, date, type: 'email', direction: 'sent',
           subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200) });
       }
     }
+
+    // Wenn Namenssuche eine E-Mail-Adresse liefert, für künftige Suchen speichern
+    if (!_contactEmail && result.length > 0 && result[0].fromEmail) {
+      _contactEmail = result[0].fromEmail;
+    }
+
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {
     console.warn('fetchEmails:', e.message);
-    if (e.message?.startsWith('403')) throw e; // 403 nach oben propagieren
+    if (e.message?.startsWith('403')) throw e;
     return [];
   }
 }

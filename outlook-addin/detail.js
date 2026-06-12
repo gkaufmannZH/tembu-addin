@@ -192,9 +192,9 @@ async function fetchEmails(since) {
       inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${sel}&$top=100&$orderby=receivedDateTime desc`);
       sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${sel}&$top=100&$orderby=sentDateTime desc`);
     } else {
-      // Fallback: Namenssuche wenn keine E-Mail-Adresse bekannt
-      inboxReq = gFetch(`/me/messages?$search=${enc('"from:' + _contactName + '"')}&${sel}&$top=100`);
-      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${enc('"to:' + _contactName + '"')}&${sel}&$top=100`);
+      // Fallback: Filter nach Anzeigename wenn keine E-Mail-Adresse bekannt
+      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/name eq '${_contactName}' and receivedDateTime ge ${s}`)}&${sel}&$top=100&$orderby=receivedDateTime desc`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/name eq '${_contactName}') and sentDateTime ge ${s}`)}&${sel}&$top=100&$orderby=sentDateTime desc`);
     }
     const [inbox, sent] = await Promise.allSettled([inboxReq, sentReq]);
     const sinceDate = s.slice(0, 10);

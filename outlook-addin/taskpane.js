@@ -60,6 +60,8 @@ Office.initialize = async function () {
 
   authed ? showForm() : showSignIn();
   wireEvents();
+  const _initItem = Office.context.mailbox?.item;
+  setContextIndicator(`Init: item=${_initItem ? _initItem.itemType ?? 'set' : 'null'} · url=${window.location.search || '(none)'}`);
   loadOutlookContext();
   if (authed) loadContactsFromGraph();
 
@@ -106,12 +108,19 @@ function resetItemContext() {
   updateBrowseTabLabel();
 }
 
+// ── Debug: context indicator in header ────────────────────────────────────
+function setContextIndicator(text) {
+  const el = document.getElementById('contextIndicator');
+  if (el) el.textContent = text;
+}
+
 // ── Read context from current Outlook item ────────────────────────────────
 function loadOutlookContext() {
   const item = Office.context.mailbox?.item;
   _contextContacts = [];
 
   if (!item) {
+    setContextIndicator('Quelle: Hauptansicht (kein Item)');
     showContactPickerSection();
     return;
   }
@@ -136,6 +145,7 @@ function loadOutlookContext() {
   }
 
   if (item.itemType === Office.MailboxEnums.ItemType.Message) {
+    setContextIndicator(`Quelle: Mail · item.itemId=${item.itemId?.slice(-8) ?? '?'}`);
     typeEl.textContent = 'E-Mail';
     badge.classList.remove('hidden');
     setSubject(subjectEl);
@@ -191,6 +201,7 @@ function loadOutlookContext() {
     } catch {}
 
   } else if (item.itemType === Office.MailboxEnums.ItemType.Appointment) {
+    setContextIndicator(`Quelle: Termin · item.itemId=${item.itemId?.slice(-8) ?? '?'}`);
     typeEl.textContent = 'Termin';
     badge.classList.remove('hidden');
     setSubject(subjectEl);

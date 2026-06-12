@@ -88,9 +88,12 @@ function resetItemContext() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['participantPicker', 'followUpSection', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
+  ['participantPicker', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
+  const followUpCheck = document.getElementById('followUpCheck');
+  if (followUpCheck) followUpCheck.checked = false;
+  document.getElementById('followUpOptions')?.classList.add('hidden');
 
   // Remove any existing ribbon notification from previous item
   try {
@@ -238,12 +241,6 @@ async function loadContactsFromGraph(forcePickerMode) {
         ? data['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0', '')
         : null;
     }
-    const datalist = document.getElementById('contactSuggestions');
-    if (datalist) {
-      datalist.innerHTML = _contactDirectory
-        .map(c => `<option value="${escapeTp(c.name).replace(/"/g, '&quot;')}">`)
-        .join('');
-    }
     if (forcePickerMode || !Office.context.mailbox?.item) {
       showContactPickerSection();
     } else {
@@ -290,17 +287,20 @@ function renderContactPicker(filter) {
   const q = filter.toLowerCase().trim();
   const matches = q
     ? _contactDirectory.filter(c => c.name.toLowerCase().includes(q))
-    : _contactDirectory.slice(0, 60);
+    : _contactDirectory;
   if (!matches.length) {
     list.innerHTML = '<div class="rumble-empty">Keine Treffer.</div>';
     return;
   }
   list.innerHTML = matches.map(c =>
-    `<div class="contact-picker-row" onclick="selectContactFromPicker(${JSON.stringify(c.name)}, ${JSON.stringify(c.phone)})">
+    `<div class="contact-picker-row" data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}" data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}">
       <span class="contact-picker-name">${escapeTp(c.name)}</span>
       ${c.phone ? `<span class="contact-picker-phone">${escapeTp(c.phone)}</span>` : ''}
     </div>`
   ).join('');
+  list.querySelectorAll('.contact-picker-row').forEach(row => {
+    row.addEventListener('click', () => selectContactFromPicker(row.dataset.name, row.dataset.phone));
+  });
 }
 
 function filterContactPicker(val) {
@@ -490,19 +490,28 @@ async function loadMeetingBriefing() {
   } catch {}
 }
 
-// ── Outlook Task aus Rumble erstellen (Nachbereitung) ─────────────────────
-async function createFollowUpTask(contactName, rumbleText) {
+// ── Outlook Task aus Rumble erstellen ─────────────────────────────────────
+async function createFollowUpTask(contactName, rumbleText, dueDate) {
   try {
     const lists = await graphFetch('GET', '/me/todo/lists');
     const defaultList = (lists.value || []).find(l => l.isDefaultList) || lists.value?.[0];
     if (!defaultList) return false;
-    await graphFetch('POST', `/me/todo/lists/${defaultList.id}/tasks`, {
+    const task = {
       title: `${contactName}: ${rumbleText.slice(0, 100)}`,
       body: { content: rumbleText, contentType: 'text' },
       importance: 'high',
-    });
+    };
+    if (dueDate) {
+      task.dueDateTime = { dateTime: new Date(dueDate).toISOString().slice(0, 19), timeZone: 'UTC' };
+    }
+    await graphFetch('POST', `/me/todo/lists/${defaultList.id}/tasks`, task);
     return true;
   } catch { return false; }
+}
+
+function toggleFollowUpOptions() {
+  const checked = document.getElementById('followUpCheck')?.checked;
+  document.getElementById('followUpOptions')?.classList.toggle('hidden', !checked);
 }
 
 // ── Save handler ──────────────────────────────────────────────────────────
@@ -521,40 +530,27 @@ async function handleSave() {
 
   try {
     await saveRumble(contactName, contactPhone, rumbleText);
+
+    const followUpCheck = document.getElementById('followUpCheck');
+    if (followUpCheck?.checked) {
+      const note = document.getElementById('followUpNote')?.value?.trim() || rumbleText;
+      const dueDate = document.getElementById('followUpDate')?.value || null;
+      await createFollowUpTask(contactName, note, dueDate);
+      followUpCheck.checked = false;
+      const noteEl = document.getElementById('followUpNote');
+      const dateEl = document.getElementById('followUpDate');
+      if (noteEl) noteEl.value = '';
+      if (dateEl) dateEl.value = '';
+      document.getElementById('followUpOptions')?.classList.add('hidden');
+    }
+
     showStatus('Rumble gespeichert ✓ Wird beim nächsten App-Start synchronisiert.', 'success');
     document.getElementById('rumbleText').value = '';
-    showFollowUpSection(contactName, rumbleText);
   } catch (e) {
     showStatus(`Fehler: ${e.message}`, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Rumble speichern';
-  }
-}
-
-// ── Follow-up Task section (Point 3: Erledigt + Diktat) ──────────────────
-function showFollowUpSection(contactName, rumbleText) {
-  const section = document.getElementById('followUpSection');
-  if (!section) return;
-  section.classList.remove('hidden');
-  const noteInput = document.getElementById('followUpNote');
-  if (noteInput) noteInput.value = '';
-  const btn = document.getElementById('btnFollowUp');
-  if (btn) {
-    btn.onclick = async () => {
-      const note = noteInput?.value?.trim() || rumbleText;
-      btn.disabled = true;
-      btn.textContent = 'Erstelle…';
-      const ok = await createFollowUpTask(contactName, note);
-      if (ok) {
-        showStatus('Aufgabe in Outlook erstellt ✓', 'success');
-        section.classList.add('hidden');
-      } else {
-        showStatus('Aufgabe konnte nicht erstellt werden.', 'error');
-        btn.disabled = false;
-        btn.textContent = 'Als Outlook-Aufgabe speichern';
-      }
-    };
   }
 }
 

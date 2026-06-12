@@ -152,28 +152,27 @@
     .briefing-text { font-size: 12px; color: #444; }
 
     /* Follow-up task section */
-    #followUpSection {
-      background: #fffbf0; border: 1px solid #e8d8a0;
-      border-radius: 8px; padding: 10px 11px;
+    .followup-check-label {
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      font-size: 13px; color: #1a1a1a;
     }
-    .followup-label {
-      font-size: 11px; font-weight: 600; color: #7a6020; margin-bottom: 6px;
+    .followup-check-label input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer; accent-color: #2d5a5a; flex-shrink: 0;
     }
     .followup-input {
       width: 100%; border: 1.5px solid #ddd; border-radius: 6px;
       padding: 7px 9px; font-size: 13px; color: #1a1a1a;
       background: #fff; outline: none; font-family: inherit;
-      resize: vertical; min-height: 52px;
+      resize: vertical; min-height: 52px; box-sizing: border-box;
     }
-    .followup-input:focus { border-color: #c8a040; }
-    .btn-followup {
-      display: block; width: 100%; margin-top: 8px;
-      background: #c8a040; color: #fff; border: none;
-      border-radius: 8px; padding: 9px; font-size: 13px;
-      font-weight: 700; cursor: pointer;
+    .followup-input:focus { border-color: #2d5a5a; }
+    .followup-date {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 6px;
+      padding: 7px 9px; font-size: 13px; color: #1a1a1a;
+      background: #fff; outline: none; font-family: inherit; box-sizing: border-box;
     }
-    .btn-followup:hover { opacity: 0.88; }
-    .btn-followup:disabled { opacity: 0.45; cursor: not-allowed; }
+    .followup-date:focus { border-color: #2d5a5a; }
+    .followup-options { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
 
     /* Contact picker (Ribbon-Button mode) */
     .contact-picker-row {
@@ -202,7 +201,7 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v35 · M1.0.3.3</span></div>
+      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v36 · M1.0.3.3</span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
@@ -251,8 +250,7 @@
 
       <div class="field" style="margin-top:4px">
         <label>Kontakt</label>
-        <input type="text" id="contactName" list="contactSuggestions" placeholder="Name des Kontakts" autocomplete="off" />
-        <datalist id="contactSuggestions"></datalist>
+        <input type="text" id="contactName" placeholder="Name des Kontakts" autocomplete="off" />
       </div>
 
       <!-- Participant picker: shown when email/appointment has multiple people -->
@@ -271,14 +269,19 @@
         <textarea id="rumbleText" placeholder="Was möchtest du beim nächsten Treffen besprechen?"></textarea>
       </div>
 
-      <button class="btn-save" id="btnSave">Rumble speichern</button>
-
-      <!-- Follow-up Outlook Task (Point 3): appears after saving a Rumble -->
-      <div id="followUpSection" class="hidden" style="margin-top:4px">
-        <div class="followup-label">Als Outlook-Aufgabe speichern (optional)</div>
-        <textarea class="followup-input" id="followUpNote" placeholder="Aufgabe oder Notiz zum Gespräch…"></textarea>
-        <button class="btn-followup" id="btnFollowUp">Als Outlook-Aufgabe speichern</button>
+      <!-- Follow-up Outlook Task: checkbox shown before saving -->
+      <div id="followUpSection" style="margin-top:8px">
+        <label class="followup-check-label">
+          <input type="checkbox" id="followUpCheck" onchange="toggleFollowUpOptions()" />
+          Als Outlook-Aufgabe speichern
+        </label>
+        <div id="followUpOptions" class="hidden followup-options">
+          <textarea class="followup-input" id="followUpNote" placeholder="Aufgabe oder Notiz zum Gespräch…"></textarea>
+          <input type="datetime-local" id="followUpDate" class="followup-date" />
+        </div>
       </div>
+
+      <button class="btn-save" id="btnSave" style="margin-top:8px">Rumble speichern</button>
 
       </div><!-- end #createPane -->
 
@@ -298,6 +301,6 @@
     </div>
   </div>
 
-  <script src="taskpane.js?v=20260614"></script>
+  <script src="taskpane.js?v=20260615"></script>
 </body>
 </html>

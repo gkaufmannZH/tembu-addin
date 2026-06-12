@@ -6,7 +6,7 @@
   xsi:type="MailApp">
 
   <Id>c1e2255f-88fb-42ec-beca-1dff076d0a34</Id>
-  <Version>1.0.3.2</Version>
+  <Version>1.0.3.3</Version>
   <ProviderName>Tembu</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Tembu Rumbles" />
@@ -99,7 +99,7 @@
                     <bt:Image size="80" resid="Icon.80" />
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <SourceLocation resid="Taskpane.Url" />
+                    <SourceLocation resid="Taskpane.Appt.Url" />
                   </Action>
                 </Control>
               </Group>
@@ -118,6 +118,7 @@
       <bt:Urls>
         <bt:Url id="Commands.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/commands.html" />
         <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?mode=picker" />
+        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Tembu" />
@@ -180,7 +181,7 @@
                       <bt:Image size="80" resid="Icon.80" />
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Taskpane.Url" />
+                      <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
@@ -204,7 +205,7 @@
                       <bt:Image size="80" resid="Icon.80" />
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Taskpane.Url" />
+                      <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
@@ -224,6 +225,7 @@
         <bt:Urls>
           <bt:Url id="Commands.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/commands.html" />
           <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html?mode=picker" />
+          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu.app/outlook-addin/taskpane.html" />
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Tembu" />

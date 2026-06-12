@@ -194,8 +194,8 @@ async function fetchEmails(since) {
     let inboxReq, sentReq;
     if (_contactEmail) {
       diagMode = 'email-filter';
-      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${selEmail}&$top=100&$orderby=receivedDateTime desc`);
-      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${selEmail}&$top=100&$orderby=sentDateTime desc`);
+      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${selEmail}&$top=100`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${selEmail}&$top=100`);
     } else {
       diagMode = 'name-search';
       const q = enc('"' + _contactName + '"');

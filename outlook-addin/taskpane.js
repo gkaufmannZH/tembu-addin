@@ -612,11 +612,9 @@ function showTab(tab) {
 
 function updateBrowseTabLabel() {
   const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
-  const isMsg  = _itemType === Office.MailboxEnums.ItemType.Message;
   const tabBrowse = document.getElementById('tabBrowse');
   if (!tabBrowse) return;
   if (isAppt && _appointmentAttendeeNames.length) tabBrowse.textContent = 'Teilnehmer';
-  else if (isMsg && _messageParticipantNames.length) tabBrowse.textContent = 'Empfänger';
   else tabBrowse.textContent = 'Alle Rumbles';
 }
 
@@ -650,7 +648,6 @@ function selectParticipant(name) {
 
 function _contextParticipants() {
   if (_itemType === Office.MailboxEnums.ItemType.Appointment) return _appointmentAttendeeNames;
-  if (_itemType === Office.MailboxEnums.ItemType.Message)     return _messageParticipantNames;
   return [];
 }
 

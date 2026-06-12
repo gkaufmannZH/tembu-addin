@@ -112,8 +112,9 @@ async function loadData(force) {
   setLoading('Daten werden geladen…');
 
   const cached = await getCached(_cacheKey);
-  const since  = (cached && !force)
-    ? new Date(cached.cachedAt - 60 * 60 * 1000) // 1h overlap
+  // Since-Datum: immer mindestens SINCE_MS zurück; Cache-Datum nur wenn bereits Emails vorhanden
+  const since  = (cached && !force && cached.rawData?.emails?.length > 0)
+    ? new Date(Math.min(cached.cachedAt - 60 * 60 * 1000, Date.now() - 30 * 24 * 60 * 60 * 1000))
     : new Date(Date.now() - SINCE_MS);
 
   setLoading('E-Mails und Termine werden geladen…');
@@ -193,9 +194,12 @@ async function fetchEmails(since) {
   try {
     let inboxReq, sentReq;
     if (_contactEmail) {
-      diagMode = 'email-filter';
-      inboxReq = gFetch(`/me/messages?$filter=${enc(`from/emailAddress/address eq '${_contactEmail}' and receivedDateTime ge ${s}`)}&${selEmail}&$top=100`);
-      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$filter=${enc(`toRecipients/any(r:r/emailAddress/address eq '${_contactEmail}') and sentDateTime ge ${s}`)}&${selEmail}&$top=100`);
+      // $search mit KQL "from:email" / "to:email" – zuverlässiger als $filter auf verschachtelten Feldern
+      diagMode = 'email-search';
+      const qFrom = enc('"from:' + _contactEmail + '"');
+      const qTo   = enc('"to:'   + _contactEmail + '"');
+      inboxReq = gFetch(`/me/messages?$search=${qFrom}&${selEmail}&$top=100`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${qTo}&${selEmail}&$top=100`);
     } else {
       diagMode = 'name-search';
       const q = enc('"' + _contactName + '"');

@@ -57,7 +57,9 @@ Office.initialize = async function () {
     } catch {}
   }
 
-  const pickerMode = new URLSearchParams(window.location.search).get('mode') === 'picker';
+  // picker mode only when URL requests it AND no mail/appt item is currently open
+  const pickerMode = new URLSearchParams(window.location.search).get('mode') === 'picker'
+    && !Office.context.mailbox?.item;
 
   authed ? showForm() : showSignIn();
   wireEvents();
@@ -345,7 +347,10 @@ function startSignIn() {
             } catch {}
             showForm();
             clearStatus();
-            loadContactsFromGraph(new URLSearchParams(window.location.search).get('mode') === 'picker');
+            loadContactsFromGraph(
+              new URLSearchParams(window.location.search).get('mode') === 'picker'
+              && !Office.context.mailbox?.item
+            );
           } else {
             showStatus(msg.error || 'Anmeldung fehlgeschlagen.', 'error');
           }

@@ -185,11 +185,70 @@
       color: #2d6a2d;
       margin-top: 6px;
     }
+
+    /* Meeting-Overlay */
+    .meeting-overlay {
+      background: #fffbe6;
+      border-left: 4px solid #e6a817;
+      padding: 10px 14px;
+      margin: 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .meeting-overlay-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .meeting-overlay-body { flex: 1; font-size: 13px; line-height: 1.5; }
+    .meeting-overlay-title { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: #a07000; margin-bottom: 3px; }
+    .btn-overlay-dismiss {
+      background: none; border: 1.5px solid #e6a817; border-radius: 6px;
+      padding: 3px 9px; font-size: 11px; color: #a07000; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-overlay-dismiss:hover { background: #fff3c0; }
+
+    /* Kontakt-Dropdown in Notizen */
+    .notes-contact-select {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      margin-bottom: 6px;
+      background: #fff;
+    }
+    .notes-contact-select:focus { border-color: #2d5a5a; }
+
+    /* Angesprochen-Button */
+    .btn-done {
+      display: inline-block;
+      margin-top: 5px;
+      background: none;
+      border: 1.5px solid #2d5a5a;
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 11px;
+      color: #2d5a5a;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-done:hover { background: #f0f5f5; }
+    .btn-done:disabled { opacity: 0.4; cursor: not-allowed; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="header-title">Tembu Rumbles <span style="font-size:10px;opacity:0.6">v18</span></div>
+    <div class="header-title">Tembu Rumbles <span style="font-size:10px;opacity:0.6">v19</span></div>
+  </div>
+
+  <!-- Reminder-Overlay -->
+  <div class="meeting-overlay hidden" id="meetingOverlay">
+    <div class="meeting-overlay-icon">⚠️</div>
+    <div class="meeting-overlay-body">
+      <div class="meeting-overlay-title">Offene Rumbles für Meeting-Teilnehmer</div>
+      <div id="meetingOverlayText"></div>
+    </div>
+    <button class="btn-overlay-dismiss" id="btnOverlayDismiss">✕</button>
   </div>
 
   <div id="notSignedIn">
@@ -205,11 +264,12 @@
 
     <!-- Meeting-Notizen Panel (Point 5) -->
     <div class="notes-panel hidden" id="notesPanel">
-      <div class="notes-label">Meeting-Notizen → Rumbles</div>
-      <textarea class="notes-input" id="notesInput" placeholder="Notizen aus dem Meeting eingeben. Für jeden Teilnehmer wird ein Rumble erstellt."></textarea>
+      <div class="notes-label">Meeting-Notizen → Rumble</div>
+      <select class="notes-contact-select" id="notesContact"></select>
+      <textarea class="notes-input" id="notesInput" placeholder="Notiz eingeben…"></textarea>
       <div class="notes-footer">
         <span class="notes-participant-hint" id="notesParticipantHint"></span>
-        <button class="btn-notes-save" id="btnCreateRumbles">Rumbles erstellen</button>
+        <button class="btn-notes-save" id="btnCreateRumbles">Rumble erstellen</button>
       </div>
       <div class="notes-status" id="notesStatus"></div>
     </div>

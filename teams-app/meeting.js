@@ -124,6 +124,8 @@ async function loadRumbles() {
   _allRumbles = (tasks.value || []).map(task => {
     const f = parseBody(task.body?.content);
     return {
+      id: task.id,
+      listId: list.id,
       contactName: f.CONTACT || task.title.replace(/^Tembu:\s*/i, ''),
       text: f.TEXT || task.title.replace(/^Tembu:\s*/i, ''),
       sourceUrl: f.SOURCE_URL || null,
@@ -131,6 +133,7 @@ async function loadRumbles() {
     };
   });
   await loadChatMembers();
+  checkMeetingOverlay();
 }
 
 async function loadChatMembers() {
@@ -184,7 +187,7 @@ function renderRumbles(filter) {
       const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString('de-CH') : '';
       const link = r.sourceUrl
         ? `<a class="rumble-source" href="${r.sourceUrl}" target="_blank">↗ In Outlook öffnen</a>` : '';
-      return `<div class="rumble-item"><div class="rumble-text">${escapeHtml(r.text)}</div><div class="rumble-meta">${date}</div>${link}</div>`;
+      return `<div class="rumble-item" data-id="${escapeHtml(r.id)}" data-list="${escapeHtml(r.listId)}"><div class="rumble-text">${escapeHtml(r.text)}</div><div class="rumble-meta">${date}</div>${link}<button class="btn-done" onclick="markDoneFromEl(this)">✓ Angesprochen</button></div>`;
     }).join('');
     const border = highlight ? 'border-left:3px solid #2d5a5a;' : '';
     return `<div class="section" style="${border}"><div class="section-header"><div class="avatar">${initials}</div><div class="contact-name">${escapeHtml(name)}</div><div class="rumble-count">${items.length} Rumble${items.length !== 1 ? 's' : ''}</div></div>${rows}</div>`;
@@ -221,12 +224,16 @@ function toggleNotes() {
     searchWrap.classList.add('hidden');
     rumbleList.classList.add('hidden');
     btn.textContent = '✕ Schliessen';
-    const hint = document.getElementById('notesParticipantHint');
-    if (hint) {
-      hint.textContent = _chatMemberNames.length > 0
-        ? `${_chatMemberNames.length} Teilnehmer erkannt`
-        : 'Keine Teilnehmer erkannt — Notiz als allgemeiner Rumble';
+    const sel = document.getElementById('notesContact');
+    if (sel) {
+      const names = _chatMemberNames.length > 0 ? _chatMemberNames : [];
+      sel.innerHTML = (names.length > 1 ? '<option value="__all__">Alle Teilnehmer</option>' : '') +
+        (names.length > 0
+          ? names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')
+          : '<option value="__all__">Allgemein</option>');
     }
+    const hint = document.getElementById('notesParticipantHint');
+    if (hint) hint.textContent = '';
   } else {
     panel.classList.add('hidden');
     searchWrap.classList.remove('hidden');
@@ -243,7 +250,11 @@ async function createRumblesFromNotes() {
     return;
   }
 
-  const participants = _chatMemberNames.length > 0 ? _chatMemberNames : ['Allgemein'];
+  const sel = document.getElementById('notesContact');
+  const selected = sel?.value;
+  const participants = (selected && selected !== '__all__')
+    ? [selected]
+    : (_chatMemberNames.length > 0 ? _chatMemberNames : ['Allgemein']);
   const btn = document.getElementById('btnCreateRumbles');
   btn.disabled = true;
   btn.textContent = 'Erstelle…';
@@ -287,4 +298,56 @@ function wireEvents() {
   document.getElementById('searchInput')?.addEventListener('input', e => renderRumbles(e.target.value));
   document.getElementById('btnNotes')?.addEventListener('click', toggleNotes);
   document.getElementById('btnCreateRumbles')?.addEventListener('click', createRumblesFromNotes);
+  document.getElementById('btnOverlayDismiss')?.addEventListener('click', () => {
+    document.getElementById('meetingOverlay')?.classList.add('hidden');
+  });
+}
+
+// ── Angesprochen-Haken ────────────────────────────────────────────────────
+function markDoneFromEl(btn) {
+  const item = btn.closest('.rumble-item');
+  markDone(item.dataset.list, item.dataset.id, item);
+}
+
+async function markDone(listId, taskId, itemEl) {
+  const btn = itemEl.querySelector('.btn-done');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await fetch(`https://graph.microsoft.com/v1.0/me/todo/lists/${listId}/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed' }),
+    });
+    _allRumbles = _allRumbles.filter(r => r.id !== taskId);
+    const section = itemEl.closest('.section');
+    itemEl.remove();
+    if (section && !section.querySelector('.rumble-item')) section.remove();
+    updateOverlayCount();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Angesprochen'; }
+  }
+}
+
+function updateOverlayCount() {
+  const overlay = document.getElementById('meetingOverlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  const matches = _allRumbles.filter(r => isParticipant(r.contactName));
+  if (!matches.length) { overlay.classList.add('hidden'); return; }
+  const names = [...new Set(matches.map(r => r.contactName))];
+  document.getElementById('meetingOverlayText').innerHTML = names.map(n => {
+    const count = matches.filter(r => r.contactName === n).length;
+    return `<strong>${escapeHtml(n)}</strong>: ${count} offene${count !== 1 ? '' : 'r'} Rumble${count !== 1 ? 's' : ''}`;
+  }).join('<br/>');
+}
+
+// ── Reminder-Overlay ──────────────────────────────────────────────────────
+function checkMeetingOverlay() {
+  const matches = _allRumbles.filter(r => isParticipant(r.contactName));
+  if (!matches.length) return;
+  const names = [...new Set(matches.map(r => r.contactName))];
+  document.getElementById('meetingOverlayText').innerHTML = names.map(n => {
+    const count = matches.filter(r => r.contactName === n).length;
+    return `<strong>${escapeHtml(n)}</strong>: ${count} offene${count !== 1 ? '' : 'r'} Rumble${count !== 1 ? 's' : ''}`;
+  }).join('<br/>');
+  document.getElementById('meetingOverlay')?.classList.remove('hidden');
 }

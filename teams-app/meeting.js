@@ -3,7 +3,9 @@
 const CLIENT_ID   = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const AUTH_URL    = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
 const SCOPES      = ['User.Read', 'Tasks.ReadWrite', 'Chat.ReadBasic'];
-const TEMBU_LIST  = 'Tembu';
+const TEMBU_LIST  = TCore.TEMBU_LIST;
+
+const escapeHtml = TCore.escapeHtml;
 
 let _token = null;
 let _allRumbles = [];
@@ -78,54 +80,20 @@ async function signIn() {
   }
 }
 
-// ── Graph ─────────────────────────────────────────────────────────────────
-async function graphGet(path) {
-  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
-    headers: { Authorization: `Bearer ${_token}` },
-  });
-  if (!res.ok) throw new Error(`Graph ${res.status}`);
-  return res.json();
-}
-
-async function graphPost(path, body) {
-  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Graph POST ${res.status}`);
-  return res.json();
-}
-
-function parseBody(text) {
-  const r = {};
-  for (const line of (text || '').split('\n')) {
-    const i = line.indexOf(':');
-    if (i > 0) r[line.slice(0, i).trim()] = line.slice(i + 1).trim();
-  }
-  return r;
-}
-
-async function getOrCreateTembuList() {
-  const lists = await graphGet('/me/todo/lists');
-  const existing = lists.value?.find(l => l.displayName === TEMBU_LIST);
-  if (existing) return existing.id;
-  const created = await graphPost('/me/todo/lists', { displayName: TEMBU_LIST });
-  return created.id;
-}
+// ── Graph (thin wrappers über TCore) ──────────────────────────────────────
+async function graphGet(path) { return TCore.graphGet(_token, path); }
+async function graphPost(path, body) { return TCore.graphPost(_token, path, body); }
+async function graphPatch(path, body) { return TCore.graphPatch(_token, path, body); }
+async function getOrCreateTembuList() { return TCore.getOrCreateTembuList(_token); }
 
 async function loadRumbles() {
-  const lists = await graphGet('/me/todo/lists');
-  const list = lists.value?.find(l => l.displayName === TEMBU_LIST);
-  if (!list) { _allRumbles = []; return; }
-  const tasks = await graphGet(
-    `/me/todo/lists/${list.id}/tasks?$filter=status ne 'completed'&$top=200`
-  );
-  _allRumbles = (tasks.value || []).map(task => {
-    const f = parseBody(task.body?.content);
+  const { listId, tasks } = await TCore.fetchRumbleTasks(_token);
+  if (!listId) { _allRumbles = []; return; }
+  _allRumbles = tasks.map(task => {
+    const f = TCore.parseBody(task.body?.content);
     return {
       id: task.id,
-      listId: list.id,
+      listId,
       contactName: f.CONTACT || task.title.replace(/^Tembu:\s*/i, ''),
       text: f.TEXT || task.title.replace(/^Tembu:\s*/i, ''),
       sourceUrl: f.SOURCE_URL || null,
@@ -205,10 +173,6 @@ function renderRumbles(filter) {
     html += allContacts.map(n => renderContact(n, false)).join('');
   }
   list.innerHTML = html;
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── Meeting-Notizen (Point 5) ─────────────────────────────────────────────
@@ -313,11 +277,7 @@ async function markDone(listId, taskId, itemEl) {
   const btn = itemEl.querySelector('.btn-done');
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
-    await fetch(`https://graph.microsoft.com/v1.0/me/todo/lists/${listId}/tasks/${taskId}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'completed' }),
-    });
+    await TCore.markTaskDone(_token, listId, taskId);
     _allRumbles = _allRumbles.filter(r => r.id !== taskId);
     const section = itemEl.closest('.section');
     itemEl.remove();

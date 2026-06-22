@@ -1,4 +1,4 @@
-/* Tembu Contact Intelligence – detail.js */
+/* Tembu Contact Intelligence – detail.js v20260622 */
 
 const SESSION_KEY   = '@tembu_outlook_session';
 const DIALOG_TK_KEY = '@tembu_dialog_token';
@@ -6,15 +6,21 @@ const SETTINGS_KEY  = '@tembu_detail_settings';
 const DB_NAME       = 'tembu_cache_v1';
 const STORE_NAME    = 'contact_analyses';
 const TEMBU_LIST    = 'Tembu';
-const SINCE_MONTHS_KEY = 'tembu_since_months';
+const SINCE_MONTHS_KEY     = 'tembu_since_months';
 const SINCE_MONTHS_DEFAULT = 24;
-const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;            // 24 hours
+const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;
+
+const AI_PROVIDER_KEY = 'tembu_ai_provider';
+const AI_MODEL_KEY    = 'tembu_ai_model';
+const AI_ENDPOINT_KEY = 'tembu_ai_endpoint';
 
 let _token        = null;
 let _contactName  = '';
 let _contactEmail = '';
 let _cacheKey     = '';
 let _rawData      = null;
+
+const esc = TCore.esc;
 
 // ── Since-Datum ───────────────────────────────────────────────────────────
 function getSinceMonths() {
@@ -105,6 +111,32 @@ function saveSettings(patch) {
 }
 function getApiKey() { return loadSettings().apiKey || ''; }
 
+// ── KI-Konfiguration ──────────────────────────────────────────────────────
+function getAIConfig() {
+  const settings = loadSettings();
+  const saved = localStorage.getItem(AI_PROVIDER_KEY);
+  const provider = saved || detectProviderFromKey(settings.apiKey || '');
+  return {
+    provider: provider || 'gemini',
+    apiKey:   settings.apiKey || '',
+    model:    localStorage.getItem(AI_MODEL_KEY)    || '',
+    endpoint: localStorage.getItem(AI_ENDPOINT_KEY) || '',
+  };
+}
+
+function detectProviderFromKey(key) {
+  if (!key) return null;
+  if (key.startsWith('AIza'))    return 'gemini';
+  if (key.startsWith('sk-ant-')) return 'anthropic';
+  if (key.startsWith('gsk_'))    return 'groq';
+  if (key.startsWith('sk-'))     return 'openai';
+  return 'gemini';
+}
+
+function isLocalProvider(provider) {
+  return provider === 'ollama' || provider === 'lmstudio';
+}
+
 // ── IndexedDB cache ───────────────────────────────────────────────────────
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -168,7 +200,7 @@ async function loadData(force) {
 
   _rawData = { emails, meetings, rumbles };
 
-  // Merge with cached raw data for incremental update
+  // Merge mit gecachten Daten für inkrementelles Update
   if (cached && !force && cached.rawData) {
     const seenEmails = new Set(cached.rawData.emails.map(e => e.id).filter(Boolean));
     const newEmails  = emails.filter(e => !e.id || !seenEmails.has(e.id));
@@ -204,14 +236,16 @@ async function forceRefresh() {
   await loadData(true);
 }
 
-// ── Graph helpers ─────────────────────────────────────────────────────────
+// ── Graph helper (thin wrapper mit 403-Spezialbehandlung) ─────────────────
 async function gFetch(path) {
-  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
-    headers: { Authorization: `Bearer ${_token}` },
-  });
-  if (res.status === 403) throw new Error('403: Bitte in der Taskpane abmelden und neu anmelden (neue Berechtigungen erforderlich).');
-  if (!res.ok) throw new Error(`Graph ${res.status}`);
-  return res.json();
+  try {
+    return await TCore.graphGet(_token, path);
+  } catch (e) {
+    if (e.message?.startsWith('Graph 403')) {
+      throw new Error('403: Bitte in der Taskpane abmelden und neu anmelden (neue Berechtigungen erforderlich).');
+    }
+    throw e;
+  }
 }
 
 // ── Fetch emails ──────────────────────────────────────────────────────────
@@ -225,7 +259,6 @@ async function fetchEmails(since) {
   try {
     let inboxReq, sentReq;
     if (_contactEmail) {
-      // $search mit KQL "from:email" / "to:email" – zuverlässiger als $filter auf verschachtelten Feldern
       diagMode = 'email-search';
       const qFrom = enc('"from:' + _contactEmail + '"');
       const qTo   = enc('"to:'   + _contactEmail + '"');
@@ -240,7 +273,6 @@ async function fetchEmails(since) {
     }
     const [inbox, sent] = await Promise.allSettled([inboxReq, sentReq]);
     const result = [];
-    // Anrede-Präfixe entfernen (Herr/Frau/Dr./Prof. etc.) für zuverlässigeren Namensvergleich
     const nameLower = _contactName.toLowerCase()
       .replace(/^(herr|frau|hr\.|fr\.|dr\.|prof\.|ing\.|mag\.|dipl\.|lic\.)\s+/gi, '').trim();
 
@@ -286,8 +318,7 @@ async function fetchEmails(since) {
       _contactEmail = result[0].fromEmail;
     }
 
-    // Diagnose-Info in UI einblenden
-    showDiag(`js:20260627 | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
+    showDiag(`js:20260622 | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {
@@ -340,11 +371,11 @@ async function fetchRumbles() {
     const data  = await gFetch(`/me/todo/lists/${tembuLst.id}/tasks?$top=200`);
     const cn    = _contactName.toLowerCase().trim();
     return (data.value || []).filter(t => {
-      const f    = parseFields(t.body?.content || '');
+      const f    = TCore.parseBody(t.body?.content || '');
       const name = (f.CONTACT || t.title.replace(/^Tembu:\s*/i, '')).toLowerCase().trim();
       return name === cn || name.includes(cn) || cn.includes(name);
     }).map(t => {
-      const f = parseFields(t.body?.content || '');
+      const f = TCore.parseBody(t.body?.content || '');
       return {
         id: t.id, type: 'rumble',
         date: (f.CREATED || t.createdDateTime || '').slice(0, 10),
@@ -355,19 +386,11 @@ async function fetchRumbles() {
   } catch (e) { console.warn('fetchRumbles:', e.message); return []; }
 }
 
-function parseFields(text) {
-  const r = {};
-  for (const line of (text || '').split('\n')) {
-    const i = line.indexOf(':');
-    if (i > 0) r[line.slice(0, i).trim()] = line.slice(i + 1).trim();
-  }
-  return r;
-}
-
 // ── AI ────────────────────────────────────────────────────────────────────
 async function runAI(data) {
-  const apiKey = getApiKey();
-  if (!apiKey) {
+  const config = getAIConfig();
+  const hasKey = isLocalProvider(config.provider) || !!config.apiKey;
+  if (!hasKey) {
     document.getElementById('noKeyBox').classList.remove('hidden');
     renderThemesEmpty();
     return;
@@ -375,8 +398,8 @@ async function runAI(data) {
 
   setLoading('KI analysiert…');
   try {
-    const raw    = await callAI(buildPrompt(data), apiKey);
-    const parsed = parseAIResponse(raw);
+    const raw    = await TCore.callAI(buildPrompt(data), config);
+    const parsed = TCore.parseAIResponse(raw);
     showDiag(document.getElementById('diagPanel')?.textContent + ` | KI: ${raw.length}ch themes:${parsed.themes?.length ?? '?'} raw:${raw.slice(0, 80).replace(/\n/g, ' ')}`);
     renderAiAnalysis(parsed);
     renderThemes(parsed.themes || []);
@@ -427,84 +450,7 @@ ${eLines ? `E-MAILS:\n${eLines}\n\n` : ''}${mLines ? `MEETINGS:\n${mLines}\n\n` 
 }`;
 }
 
-function parseAIResponse(raw) {
-  let text = raw.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-  try { return JSON.parse(text); } catch {}
-  const m = text.match(/\{[\s\S]*\}/);
-  if (m) { try { return JSON.parse(m[0]); } catch {} }
-  return { summary: text.slice(0, 400), themes: [], openPoints: [], sentiment: 'neutral', nextStep: '', background: '' };
-}
-
-// ── AI provider routing ───────────────────────────────────────────────────
-function detectProvider(key) {
-  if (!key) return null;
-  if (key.startsWith('AIza'))    return 'gemini';
-  if (key.startsWith('sk-ant-')) return 'anthropic';
-  if (key.startsWith('gsk_'))    return 'groq';
-  if (key.startsWith('sk-'))     return 'openai';
-  return 'gemini';
-}
-
-async function callAI(prompt, apiKey) {
-  switch (detectProvider(apiKey)) {
-    case 'anthropic': return callAnthropic(prompt, apiKey);
-    case 'groq':      return callGroq(prompt, apiKey);
-    case 'openai':    return callOpenAI(prompt, apiKey);
-    default:          return callGemini(prompt, apiKey);
-  }
-}
-
-async function callGemini(prompt, apiKey) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 8192 } }) }
-  );
-  if (!res.ok) { const t = await res.text(); throw new Error(`Gemini ${res.status}: ${t.slice(0, 120)}`); }
-  const d = await res.json();
-  const parts = d.candidates?.[0]?.content?.parts || [];
-  const text = parts.filter(p => !p.thought).map(p => p.text || '').join('');
-  return text;
-}
-
-async function callAnthropic(prompt, apiKey) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2048, messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!res.ok) { const t = await res.text(); throw new Error(`Claude ${res.status}: ${t.slice(0, 120)}`); }
-  const d = await res.json();
-  return d.content?.[0]?.text || '';
-}
-
-async function callOpenAI(prompt, apiKey) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 2048, messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!res.ok) { const t = await res.text(); throw new Error(`OpenAI ${res.status}: ${t.slice(0, 120)}`); }
-  const d = await res.json();
-  return d.choices?.[0]?.message?.content || '';
-}
-
-async function callGroq(prompt, apiKey) {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'llama-3.1-70b-versatile', max_tokens: 2048, messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!res.ok) { const t = await res.text(); throw new Error(`Groq ${res.status}: ${t.slice(0, 120)}`); }
-  const d = await res.json();
-  return d.choices?.[0]?.message?.content || '';
-}
-
 // ── Rendering ─────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 function fmtDate(d) {
   if (!d) return '';
   try { return new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
@@ -512,8 +458,8 @@ function fmtDate(d) {
 }
 
 function updateHeader(data) {
-  const all    = [...data.emails, ...data.meetings, ...data.rumbles].filter(i => i.date).sort((a, b) => b.date.localeCompare(a.date));
-  const parts  = [];
+  const all   = [...data.emails, ...data.meetings, ...data.rumbles].filter(i => i.date).sort((a, b) => b.date.localeCompare(a.date));
+  const parts = [];
   if (all.length) {
     const last = all[0];
     const lbl  = last.type === 'email' ? 'Mail' : last.type === 'meeting' ? 'Meeting' : 'Rumble';
@@ -540,7 +486,7 @@ function renderAiAnalysis(a) {
     document.getElementById('aiNextStep').classList.remove('hidden');
   }
 
-  const sentMap  = { positiv: ['s-pos', 'Positiv'], neutral: ['s-neu', 'Neutral'], negativ: ['s-neg', 'Negativ'] };
+  const sentMap = { positiv: ['s-pos', 'Positiv'], neutral: ['s-neu', 'Neutral'], negativ: ['s-neg', 'Negativ'] };
   const [cls, lbl] = sentMap[a.sentiment] || sentMap.neutral;
   const meta = document.getElementById('headerMeta');
   meta.querySelectorAll('.sentiment').forEach(el => el.remove());
@@ -551,9 +497,9 @@ function renderAiAnalysis(a) {
     document.getElementById('openPointsList').innerHTML = a.openPoints.map(p => `<div class="open-point">${esc(p)}</div>`).join('');
   }
 
-  const key = getApiKey();
-  const providerLabels = { gemini: 'Gemini', anthropic: 'Claude', openai: 'GPT-4o', groq: 'Groq/Llama' };
-  document.getElementById('providerBadge').textContent = providerLabels[detectProvider(key)] || 'KI';
+  const config = getAIConfig();
+  const providerLabels = { gemini: 'Gemini', anthropic: 'Claude', openai: 'GPT-4o', groq: 'Groq/Llama', ollama: 'Ollama', lmstudio: 'LM Studio' };
+  document.getElementById('providerBadge').textContent = providerLabels[config.provider] || 'KI';
 }
 
 function renderTimeline(data) {
@@ -572,8 +518,8 @@ function renderTimeline(data) {
   list.innerHTML = items.map(item => {
     let icon, iconCls, badgeCls, badgeTxt;
     if (item.type === 'email') {
-      icon    = item.direction === 'received' ? '📧' : '📤';
-      iconCls = item.direction === 'received' ? 'tl-email-in' : 'tl-email-out';
+      icon     = item.direction === 'received' ? '📧' : '📤';
+      iconCls  = item.direction === 'received' ? 'tl-email-in' : 'tl-email-out';
       badgeCls = item.direction === 'received' ? 'b-email-in' : 'b-email-out';
       badgeTxt = item.direction === 'received' ? 'Empfangen' : 'Gesendet';
     } else if (item.type === 'meeting') {
@@ -614,7 +560,8 @@ function renderThemes(themes) {
 }
 
 function renderThemesEmpty(msg) {
-  const hasKey = !!getApiKey();
+  const config = getAIConfig();
+  const hasKey = isLocalProvider(config.provider) || !!config.apiKey;
   const text = msg || (hasKey
     ? 'Keine Themen gefunden.<br/>Drücke OK um die Analyse neu zu starten.'
     : 'Kein KI-Key eingetragen.<br/>Gib oben einen API-Key ein um Themen zu erkennen.');

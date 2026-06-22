@@ -116,16 +116,31 @@
   <!-- Header -->
   <div class="header">
     <div class="header-name" id="headerName">…</div>
-    <div class="header-meta" id="headerMeta"><span style="opacity:0.5;font-size:10px">v20260622</span></div>
+    <div class="header-meta" id="headerMeta"><span style="opacity:0.5;font-size:10px">v20260622b</span></div>
   </div>
 
-  <!-- Settings: API Key + Zeitraum -->
+  <!-- Settings: KI-Provider + Key/Endpoint + Zeitraum -->
   <div class="settings-bar">
-    <span class="settings-label">KI-Key</span>
+    <span class="settings-label">KI</span>
+    <select class="settings-input" id="providerSelect" style="flex:0;min-width:0;width:auto;padding:4px 6px">
+      <option value="gemini">Gemini</option>
+      <option value="anthropic">Claude</option>
+      <option value="groq">Groq</option>
+      <option value="openai">OpenAI</option>
+      <option value="ollama">Ollama (lokal)</option>
+      <option value="lmstudio">LM Studio</option>
+    </select>
+    <!-- Cloud: API Key -->
     <input type="password" class="settings-input" id="apiKeyInput"
-      placeholder="AIza… Gemini · sk-ant-… Claude API · sk-… OpenAI · gsk_… Groq" autocomplete="off" />
+      placeholder="API Key (AIza… / sk-ant-… / sk-… / gsk_…)" autocomplete="off" />
     <button class="settings-btn" id="btnSaveKey">OK</button>
-    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link">Gratis Gemini Key →</a>
+    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link" id="geminiLink">Gratis →</a>
+    <!-- Lokal: Endpoint + Modell -->
+    <input type="text" class="settings-input hidden" id="localEndpoint"
+      placeholder="http://localhost:11434" autocomplete="off" style="max-width:180px" />
+    <input type="text" class="settings-input hidden" id="localModel"
+      placeholder="Modell (z.B. qwen2.5:14b)" autocomplete="off" style="max-width:145px" />
+    <button class="settings-btn hidden" id="btnSaveLocal">OK</button>
     <span class="settings-label" style="margin-left:8px">Zeitraum</span>
     <select class="settings-input" id="sinceSelect" style="flex:0;min-width:0;width:auto;padding:4px 6px">
       <option value="6">6 Monate</option>
@@ -171,7 +186,7 @@
           <div class="no-key-icon">🔑</div>
           <div class="no-key-title">KI-Analyse verfügbar</div>
           <div class="no-key-desc" id="noKeyDesc">Gib oben einen API-Key ein für intelligente Zusammenfassungen.<br/><br/>Gemini API ist kostenlos — nur ein Google-Account nötig.</div>
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" class="no-key-btn">Gratis Gemini Key holen →</a>
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" class="no-key-btn" id="noKeyBtn">Gratis Gemini Key holen →</a>
         </div>
       </div>
       <div class="cache-info hidden" id="cacheInfo">
@@ -194,6 +209,6 @@
   </div>
 
   <script src="../shared/tembu-core.js"></script>
-  <script src="detail.js?v=20260622"></script>
+  <script src="detail.js?v=20260622b"></script>
 </body>
 </html>

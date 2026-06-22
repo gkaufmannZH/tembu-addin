@@ -58,6 +58,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settings = loadSettings();
   if (settings.apiKey) document.getElementById('apiKeyInput').value = settings.apiKey;
 
+  // Provider-Auswahl
+  const aiConfig = getAIConfig();
+  const providerSelect = document.getElementById('providerSelect');
+  providerSelect.value = aiConfig.provider;
+  if (aiConfig.endpoint) document.getElementById('localEndpoint').value = aiConfig.endpoint;
+  if (aiConfig.model)    document.getElementById('localModel').value    = aiConfig.model;
+  updateProviderUI(aiConfig.provider);
+  providerSelect.addEventListener('change', () => {
+    const p = providerSelect.value;
+    localStorage.setItem(AI_PROVIDER_KEY, p);
+    updateProviderUI(p);
+  });
+  document.getElementById('btnSaveKey').addEventListener('click', onSaveKey);
+  document.getElementById('btnSaveLocal').addEventListener('click', onSaveLocal);
+
   const sinceSelect = document.getElementById('sinceSelect');
   sinceSelect.value = localStorage.getItem(SINCE_MONTHS_KEY) || String(SINCE_MONTHS_DEFAULT);
   sinceSelect.addEventListener('change', () => {
@@ -66,8 +81,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadData(true);
   });
   updateSinceLabel();
-
-  document.getElementById('btnSaveKey').addEventListener('click', onSaveKey);
 
   _token = getStoredToken();
   if (!_token) {
@@ -82,6 +95,31 @@ function onSaveKey() {
   const key = document.getElementById('apiKeyInput').value.trim();
   saveSettings({ apiKey: key });
   if (_rawData) runAI(_rawData);
+}
+
+function onSaveLocal() {
+  const endpoint = document.getElementById('localEndpoint').value.trim();
+  const model    = document.getElementById('localModel').value.trim();
+  if (endpoint) localStorage.setItem(AI_ENDPOINT_KEY, endpoint);
+  if (model)    localStorage.setItem(AI_MODEL_KEY,    model);
+  if (_rawData) runAI(_rawData);
+}
+
+function updateProviderUI(provider) {
+  const isLocal = isLocalProvider(provider);
+  document.getElementById('apiKeyInput').classList.toggle('hidden', isLocal);
+  document.getElementById('btnSaveKey').classList.toggle('hidden', isLocal);
+  document.getElementById('geminiLink').classList.toggle('hidden', isLocal || provider !== 'gemini');
+  document.getElementById('localEndpoint').classList.toggle('hidden', !isLocal);
+  document.getElementById('localModel').classList.toggle('hidden', !isLocal);
+  document.getElementById('btnSaveLocal').classList.toggle('hidden', !isLocal);
+  // Standard-Endpoint vorausfüllen wenn leer
+  const endpointEl = document.getElementById('localEndpoint');
+  if (isLocal && !endpointEl.value) {
+    endpointEl.value = provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434';
+  }
+  const noKeyBtn = document.getElementById('noKeyBtn');
+  if (noKeyBtn) noKeyBtn.classList.toggle('hidden', isLocal);
 }
 
 // ── Token ─────────────────────────────────────────────────────────────────
@@ -318,7 +356,7 @@ async function fetchEmails(since) {
       _contactEmail = result[0].fromEmail;
     }
 
-    showDiag(`js:20260622 | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
+    showDiag(`js:20260622b | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {
@@ -414,7 +452,9 @@ async function runAI(data) {
     showDiag((document.getElementById('diagPanel')?.textContent || '') + ` | KI-Fehler: ${errMsg.slice(0, 100)}`);
     const noKeyBox = document.getElementById('noKeyBox');
     const desc = document.getElementById('noKeyDesc');
-    if (desc) desc.innerHTML = 'Fehler: ' + esc(errMsg) + '<br/><br/>Tipp: Gemini-Konto braucht Guthaben &gt; CHF 0 oder nutze einen anderen Key.';
+    if (desc) desc.innerHTML = 'Fehler: ' + esc(errMsg) + '<br/><br/>' + (isLocalProvider(config.provider)
+      ? 'Tipp: Stelle sicher, dass Ollama/LM Studio läuft und das Modell geladen ist.'
+      : 'Tipp: Gemini-Konto braucht Guthaben &gt; CHF 0 oder nutze einen anderen Key.');
     if (noKeyBox) noKeyBox.classList.remove('hidden');
     renderThemesEmpty('Analyse fehlgeschlagen — Fehler in Diagnose-Leiste (unten).');
   }

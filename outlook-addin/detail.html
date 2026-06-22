@@ -116,16 +116,24 @@
   <!-- Header -->
   <div class="header">
     <div class="header-name" id="headerName">…</div>
-    <div class="header-meta" id="headerMeta"><span style="opacity:0.5;font-size:10px">v20260619</span></div>
+    <div class="header-meta" id="headerMeta"><span style="opacity:0.5;font-size:10px">v20260622</span></div>
   </div>
 
-  <!-- Settings: API Key -->
+  <!-- Settings: API Key + Zeitraum -->
   <div class="settings-bar">
     <span class="settings-label">KI-Key</span>
     <input type="password" class="settings-input" id="apiKeyInput"
       placeholder="AIza… Gemini · sk-ant-… Claude API · sk-… OpenAI · gsk_… Groq" autocomplete="off" />
     <button class="settings-btn" id="btnSaveKey">OK</button>
     <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link">Gratis Gemini Key →</a>
+    <span class="settings-label" style="margin-left:8px">Zeitraum</span>
+    <select class="settings-input" id="sinceSelect" style="flex:0;min-width:0;width:auto;padding:4px 6px">
+      <option value="6">6 Monate</option>
+      <option value="12">1 Jahr</option>
+      <option value="24">2 Jahre</option>
+      <option value="60">5 Jahre</option>
+      <option value="0">Alles</option>
+    </select>
   </div>
 
   <!-- Tabs -->
@@ -170,7 +178,7 @@
         <span id="cacheInfoText"></span>
         <span class="refresh-link" onclick="forceRefresh()">↻ Aktualisieren</span>
       </div>
-      <div class="section-title">Interaktionen (letzte 2 Jahre)</div>
+      <div class="section-title" id="sinceLabel">Interaktionen (letzte 2 Jahre)</div>
       <div id="timelineList"></div>
     </div>
   </div>
@@ -185,6 +193,6 @@
     <div id="backgroundContent"><div class="empty-state">Gib einen KI-Key ein um den Hintergrund zu laden.</div></div>
   </div>
 
-  <script src="detail.js?v=20260627"></script>
+  <script src="detail.js?v=20260622"></script>
 </body>
 </html>

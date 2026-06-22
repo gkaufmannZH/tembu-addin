@@ -6,7 +6,8 @@ const SETTINGS_KEY  = '@tembu_detail_settings';
 const DB_NAME       = 'tembu_cache_v1';
 const STORE_NAME    = 'contact_analyses';
 const TEMBU_LIST    = 'Tembu';
-const SINCE_MS      = 2 * 365 * 24 * 60 * 60 * 1000; // 2 years
+const SINCE_MONTHS_KEY = 'tembu_since_months';
+const SINCE_MONTHS_DEFAULT = 24;
 const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;            // 24 hours
 
 let _token        = null;
@@ -14,6 +15,30 @@ let _contactName  = '';
 let _contactEmail = '';
 let _cacheKey     = '';
 let _rawData      = null;
+
+// ── Since-Datum ───────────────────────────────────────────────────────────
+function getSinceMonths() {
+  return parseInt(localStorage.getItem(SINCE_MONTHS_KEY) || String(SINCE_MONTHS_DEFAULT));
+}
+
+function getSinceDate() {
+  const m = getSinceMonths();
+  if (m === 0) return new Date('2000-01-01');
+  return new Date(Date.now() - m * 30.44 * 24 * 60 * 60 * 1000);
+}
+
+function getSinceLabel() {
+  const m = getSinceMonths();
+  if (m === 0)  return 'Alles';
+  if (m < 12)   return `letzte ${m} Monate`;
+  if (m === 12) return 'letztes Jahr';
+  return `letzte ${Math.round(m / 12)} Jahre`;
+}
+
+function updateSinceLabel() {
+  const el = document.getElementById('sinceLabel');
+  if (el) el.textContent = `Interaktionen (${getSinceLabel()})`;
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -26,6 +51,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const settings = loadSettings();
   if (settings.apiKey) document.getElementById('apiKeyInput').value = settings.apiKey;
+
+  const sinceSelect = document.getElementById('sinceSelect');
+  sinceSelect.value = localStorage.getItem(SINCE_MONTHS_KEY) || String(SINCE_MONTHS_DEFAULT);
+  sinceSelect.addEventListener('change', () => {
+    localStorage.setItem(SINCE_MONTHS_KEY, sinceSelect.value);
+    updateSinceLabel();
+    loadData(true);
+  });
+  updateSinceLabel();
 
   document.getElementById('btnSaveKey').addEventListener('click', onSaveKey);
 
@@ -112,8 +146,7 @@ async function loadData(force) {
   setLoading('Daten werden geladen…');
 
   const cached = await getCached(_cacheKey);
-  // Since-Datum: immer 2 Jahre zurück (SINCE_MS) — $search braucht ohnehin client-seitigen Datumsfilter
-  const since = new Date(Date.now() - SINCE_MS);
+  const since = getSinceDate();
 
   setLoading('E-Mails und Termine werden geladen…');
   let emails = [], meetings = [], rumbles = [];
@@ -532,7 +565,7 @@ function renderTimeline(data) {
 
   const list = document.getElementById('timelineList');
   if (!items.length) {
-    list.innerHTML = '<div class="empty-state">Keine Interaktionen in den letzten 2 Jahren.</div>';
+    list.innerHTML = `<div class="empty-state">Keine Interaktionen (${getSinceLabel()}).</div>`;
     return;
   }
 

@@ -260,6 +260,7 @@ async function loadContactsFromGraph() {
       }
     });
     renderContactPicker('');
+    triggerPhoneLookup(); // Nachträglich ausfüllen falls Name schon gesetzt war
   } catch {}
 }
 

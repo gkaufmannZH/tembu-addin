@@ -268,7 +268,11 @@ async function loadContactsFromGraph() {
 function nameMatch(a, b) {
   const wa = a.toLowerCase().split(/\s+/).sort();
   const wb = b.toLowerCase().split(/\s+/).sort();
-  return wa.length === wb.length && wa.every((w, i) => w === wb[i]);
+  if (wa.length === wb.length) return wa.every((w, i) => w === wb[i]);
+  // Subset match: all words of shorter name must appear in longer (handles "Herr Peter Cucuz" vs "Peter Cucuz")
+  const shorter = wa.length < wb.length ? wa : wb;
+  const longer  = wa.length < wb.length ? wb : wa;
+  return shorter.every(w => longer.includes(w));
 }
 
 function onContactNameChange(name) {

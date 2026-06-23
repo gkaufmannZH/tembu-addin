@@ -804,13 +804,20 @@ function runDiag() {
     { label: 'login.microsoft.com', url: 'https://login.microsoftonline.com/common' },
     { label: 'taskpane URL', url: document.URL },
   ];
-  out.textContent = info + '\ntaskpane lädt von: ' + document.URL + '\n\nTeste URLs…';
+  const contactName = document.getElementById('contactName')?.value?.trim();
+  let dirInfo = '\nVerzeichnis: ' + _contactDirectory.length + ' Kontakte geladen';
+  if (contactName) {
+    const entry = _contactDirectory.find(c => nameMatch(c.name, contactName));
+    dirInfo += '\nKontakt "' + contactName + '": ';
+    dirInfo += entry ? '"' + entry.name + '" → ' + (entry.phone || '(keine Nummer im Graph)') : 'nicht gefunden';
+  }
+  out.textContent = info + dirInfo + '\ntaskpane lädt von: ' + document.URL + '\n\nTeste URLs…';
 
   const taskpaneUrl = document.URL;
   let i = 0;
   function next() {
     if (i >= tests.length) {
-      out.textContent = info + '\ntaskpane von: ' + taskpaneUrl + '\n\n' + results.join('\n');
+      out.textContent = info + dirInfo + '\ntaskpane von: ' + taskpaneUrl + '\n\n' + results.join('\n');
       return;
     }
     const t = tests[i++];

@@ -255,7 +255,7 @@ async function loadContactsFromGraph() {
     // Enrich context contacts with phone numbers from directory
     _contextContacts.forEach(c => {
       if (!c.phone) {
-        const match = _contactDirectory.find(d => d.name.toLowerCase() === c.name.toLowerCase());
+        const match = _contactDirectory.find(d => nameMatch(d.name, c.name));
         if (match?.phone) c.phone = match.phone;
       }
     });
@@ -263,8 +263,15 @@ async function loadContactsFromGraph() {
   } catch {}
 }
 
+// Vergleicht Namen unabhängig von Reihenfolge (Vorname/Nachname vertauscht)
+function nameMatch(a, b) {
+  const wa = a.toLowerCase().split(/\s+/).sort();
+  const wb = b.toLowerCase().split(/\s+/).sort();
+  return wa.length === wb.length && wa.every((w, i) => w === wb[i]);
+}
+
 function onContactNameChange(name) {
-  const match = _contactDirectory.find(c => c.name.toLowerCase() === name.toLowerCase());
+  const match = _contactDirectory.find(c => nameMatch(c.name, name));
   if (match?.phone) {
     const phoneInput = document.getElementById('contactPhone');
     if (phoneInput && !phoneInput.value) phoneInput.value = match.phone;
@@ -278,7 +285,7 @@ function triggerPhoneLookup() {
   if (!phoneInput || phoneInput.value) return;
   const contactName = document.getElementById('contactName')?.value?.trim();
   if (!contactName || !_contactDirectory.length) return;
-  const match = _contactDirectory.find(c => c.name.toLowerCase() === contactName.toLowerCase());
+  const match = _contactDirectory.find(c => nameMatch(c.name, contactName));
   if (match?.phone) phoneInput.value = match.phone;
 }
 

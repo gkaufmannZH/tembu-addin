@@ -354,7 +354,8 @@ function filterContactPicker(val) {
 function selectContactFromPicker(name, phone, email) {
   document.getElementById('contactName').value = name;
   const phoneInput = document.getElementById('contactPhone');
-  if (phoneInput) phoneInput.value = phone || '';
+  const resolved = phone || _contactDirectory.find(c => nameMatch(c.name, name))?.phone || '';
+  if (phoneInput) phoneInput.value = resolved;
   _contactEmail = email || null;
   document.getElementById('contactPickerSection')?.classList.add('hidden');
   const searchEl = document.getElementById('contactPickerSearch');

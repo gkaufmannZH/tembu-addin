@@ -818,7 +818,7 @@ function openCompanyDialog() {
 }
 
 function openBatchDialog() {
-  const params = new URLSearchParams({ t: _token || '', _v: '20260629g' });
+  const params = new URLSearchParams({ t: _token || '', _v: '20260629h' });
   const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/batch.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {

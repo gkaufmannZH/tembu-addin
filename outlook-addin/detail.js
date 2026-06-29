@@ -65,10 +65,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (aiConfig.endpoint) document.getElementById('localEndpoint').value = aiConfig.endpoint;
   if (aiConfig.model)    document.getElementById('localModel').value    = aiConfig.model;
   updateProviderUI(aiConfig.provider);
+  if (isLocalProvider(aiConfig.provider)) {
+    document.getElementById('backgroundContent').innerHTML =
+      '<div class="empty-state">Hintergrund wird nach der Analyse geladen.</div>';
+  }
   providerSelect.addEventListener('change', () => {
     const p = providerSelect.value;
     localStorage.setItem(AI_PROVIDER_KEY, p);
     updateProviderUI(p);
+    if (isLocalProvider(p)) {
+      document.getElementById('backgroundContent').innerHTML =
+        '<div class="empty-state">Hintergrund wird nach der Analyse geladen.</div>';
+      document.getElementById('noKeyBox')?.classList.add('hidden');
+    }
   });
   document.getElementById('btnSaveKey').addEventListener('click', onSaveKey);
   document.getElementById('btnSaveLocal').addEventListener('click', onSaveLocal);
@@ -450,13 +459,29 @@ async function runAI(data) {
     showContent();
     const errMsg = String(e.message || e);
     showDiag((document.getElementById('diagPanel')?.textContent || '') + ` | KI-Fehler: ${errMsg.slice(0, 100)}`);
-    const noKeyBox = document.getElementById('noKeyBox');
-    const desc = document.getElementById('noKeyDesc');
-    if (desc) desc.innerHTML = 'Fehler: ' + esc(errMsg) + '<br/><br/>' + (isLocalProvider(config.provider)
-      ? 'Tipp: Stelle sicher, dass Ollama/LM Studio läuft und das Modell geladen ist.'
-      : 'Tipp: Gemini-Konto braucht Guthaben &gt; CHF 0 oder nutze einen anderen Key.');
+    const noKeyBox  = document.getElementById('noKeyBox');
+    const desc      = document.getElementById('noKeyDesc');
+    const icon      = document.querySelector('#noKeyBox .no-key-icon');
+    const title     = document.querySelector('#noKeyBox .no-key-title');
+    if (isLocalProvider(config.provider)) {
+      if (icon)  icon.textContent  = '⚠️';
+      if (title) title.textContent = 'Verbindungsfehler';
+      const isFetch = errMsg.toLowerCase().includes('fetch');
+      if (desc) desc.innerHTML = 'Fehler: ' + esc(errMsg) + '<br/><br/>'
+        + (isFetch
+          ? 'CORS-Problem: Ollama muss mit <b>OLLAMA_ORIGINS=*</b> gestartet werden.<br/>PowerShell: <code>$env:OLLAMA_ORIGINS="*"; ollama serve</code><br/><br/>'
+          : '')
+        + 'Stelle sicher, dass Ollama/LM Studio läuft und ein Modell eingetragen ist.';
+    } else {
+      if (icon)  icon.textContent  = '🔑';
+      if (title) title.textContent = 'KI-Analyse verfügbar';
+      if (desc) desc.innerHTML = 'Fehler: ' + esc(errMsg) + '<br/><br/>'
+        + 'Tipp: Gemini-Konto braucht Guthaben &gt; CHF 0 oder nutze einen anderen Key.';
+    }
     if (noKeyBox) noKeyBox.classList.remove('hidden');
-    renderThemesEmpty('Analyse fehlgeschlagen — Fehler in Diagnose-Leiste (unten).');
+    document.getElementById('backgroundContent').innerHTML =
+      '<div class="empty-state">Analyse fehlgeschlagen.</div>';
+    renderThemesEmpty('Analyse fehlgeschlagen — Fehler oben sichtbar.');
   }
 }
 
@@ -483,7 +508,7 @@ ${eLines ? `E-MAILS:\n${eLines}\n\n` : ''}${mLines ? `MEETINGS:\n${mLines}\n\n` 
   "sentiment": "positiv|neutral|negativ",
   "openPoints": ["Offener Punkt 1", "Offener Punkt 2"],
   "themes": [
-    { "name": "Thema", "count": 3, "status": "offen|abgeschlossen", "summary": "Kurzbeschreibung" }
+    { "name": "Thema", "count": 3, "status": "offen|abgeschlossen", "summary": "Kurzbeschreibung", "interactions": [{"date":"YYYY-MM-DD","type":"email|meeting","subject":"Betreff"}] }
   ],
   "nextStep": "Konkrete Empfehlung für nächstes Gespräch",
   "background": "Öffentlich bekannte Infos zu ${_contactName}: Beruf, Unternehmen, Branche. Falls unbekannt: leer lassen."
@@ -499,7 +524,7 @@ function fmtDate(d) {
 
 function updateHeader(data) {
   const all   = [...data.emails, ...data.meetings, ...data.rumbles].filter(i => i.date).sort((a, b) => b.date.localeCompare(a.date));
-  const parts = [];
+  const parts = [`Zeitraum: ${getSinceLabel()}`];
   if (all.length) {
     const last = all[0];
     const lbl  = last.type === 'email' ? 'Mail' : last.type === 'meeting' ? 'Meeting' : 'Rumble';
@@ -582,19 +607,35 @@ function renderTimeline(data) {
   }).join('');
 }
 
+function toggleThemeDetail(el) {
+  const detail = el.closest('.theme-card').querySelector('.theme-interactions');
+  if (!detail) return;
+  const open = detail.classList.toggle('hidden') === false;
+  el.querySelector('.theme-toggle-arrow').textContent = open ? '▼' : '▶';
+}
+
 function renderThemes(themes) {
   const el = document.getElementById('themesContent');
   if (!themes?.length) { renderThemesEmpty(); return; }
   el.innerHTML = themes.map(t => {
     const sc  = t.status === 'offen' ? 's-open' : 's-done';
     const stx = t.status === 'offen' ? 'offen' : 'abgeschlossen';
+    const items = (t.interactions || []);
+    const detailHtml = items.map(i => {
+      const icon = i.type === 'meeting' ? '📅' : '✉';
+      return `<div class="theme-interaction"><span class="ti-icon">${icon}</span><span class="ti-date">${esc(i.date || '')}</span><span class="ti-subject">${esc(i.subject || '')}</span></div>`;
+    }).join('');
+    const countEl = items.length
+      ? `<span class="theme-count theme-count-toggle" onclick="toggleThemeDetail(this)">${t.count || items.length} Interaktionen <span class="theme-toggle-arrow">▶</span></span>`
+      : `<span class="theme-count">${t.count || ''} Interaktionen</span>`;
     return `<div class="theme-card">
       <div class="theme-header">
         <span class="theme-name">${esc(t.name)}</span>
-        <span class="theme-count">${t.count || ''} Interaktionen</span>
+        ${countEl}
         <span class="theme-status ${sc}">${stx}</span>
       </div>
       <div class="theme-summary">${esc(t.summary)}</div>
+      ${detailHtml ? `<div class="theme-interactions hidden">${detailHtml}</div>` : ''}
     </div>`;
   }).join('');
 }

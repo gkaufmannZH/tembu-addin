@@ -1,4 +1,4 @@
-/* Tembu Contact Intelligence – detail.js v20260629c */
+/* Tembu Contact Intelligence – detail.js v20260629d */
 
 const SESSION_KEY   = '@tembu_outlook_session';
 const DIALOG_TK_KEY = '@tembu_dialog_token';
@@ -522,13 +522,14 @@ function buildPrompt(data) {
   return `Du bist ein persönlicher Business-Assistent. Heute ist ${today}.
 Analysiere alle Interaktionen mit "${_contactName}"${_contactEmail ? ` (${_contactEmail})` : ''}.
 
-${eLines ? `E-MAILS:\n${eLines}\n\n` : ''}${mLines ? `MEETINGS:\n${mLines}\n\n` : ''}${rLines ? `RUMBLES:\n${rLines}\n\n` : ''}${(!eLines && !mLines && !rLines) ? 'Noch keine Interaktionen.\n\n' : ''}Antworte NUR mit validem JSON (kein Markdown):
+${eLines ? `E-MAILS:\n${eLines}\n\n` : ''}${mLines ? `MEETINGS:\n${mLines}\n\n` : ''}${rLines ? `RUMBLES:\n${rLines}\n\n` : ''}${(!eLines && !mLines && !rLines) ? 'Noch keine Interaktionen.\n\n' : ''}Antworte NUR mit validem JSON (kein Markdown).
+Wichtig: Im "interactions"-Array jedes Themas ALLE zugehörigen Interaktionen auflisten, keine Auswahl.
 {
   "summary": "2-3 Sätze zur Beziehung, Häufigkeit, Ton",
   "sentiment": "positiv|neutral|negativ",
   "openPoints": ["Offener Punkt 1", "Offener Punkt 2"],
   "themes": [
-    { "name": "Thema", "count": 3, "status": "offen|abgeschlossen", "summary": "Kurzbeschreibung", "interactions": [{"date":"YYYY-MM-DD","type":"email|meeting","subject":"Betreff"}] }
+    { "name": "Thema", "status": "offen|abgeschlossen", "summary": "Kurzbeschreibung", "interactions": [{"date":"YYYY-MM-DD","type":"email|meeting","subject":"Betreff"}] }
   ],
   "nextStep": "Konkrete Empfehlung für nächstes Gespräch",
   "background": "Öffentlich bekannte Infos zu ${_contactName}: Beruf, Unternehmen, Branche. Falls unbekannt: leer lassen."
@@ -657,10 +658,9 @@ function renderThemes(themes) {
         ? `<a class="theme-interaction ti-link" href="${esc(match.url)}" target="_blank">${inner}</a>`
         : `<div class="theme-interaction">${inner}</div>`;
     }).join('');
-    const count = items.length || t.count || 0;
     const countEl = items.length
-      ? `<span class="theme-count theme-count-toggle" onclick="toggleThemeDetail(this)">${count} Interaktionen <span class="theme-toggle-arrow">▶</span></span>`
-      : `<span class="theme-count">${count} Interaktionen</span>`;
+      ? `<span class="theme-count theme-count-toggle" onclick="toggleThemeDetail(this)">${items.length} Interaktionen <span class="theme-toggle-arrow">▶</span></span>`
+      : '';
     return `<div class="theme-card">
       <div class="theme-header">
         <span class="theme-name">${esc(t.name)}</span>

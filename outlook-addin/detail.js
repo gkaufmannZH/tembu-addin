@@ -1,4 +1,4 @@
-/* Tembu Contact Intelligence – detail.js v20260629l */
+/* Tembu Contact Intelligence – detail.js v20260629m */
 
 const SESSION_KEY   = '@tembu_outlook_session';
 const DIALOG_TK_KEY = '@tembu_dialog_token';
@@ -204,8 +204,9 @@ function isLocalProvider(provider) {
 // ── OneDrive cache (dünne Wrapper über TCore.saveAnalysis / loadAnalysis) ─
 async function saveToOneDrive(analysis) {
   const odLog = (msg) => {
-    const el = document.getElementById('cacheInfo');
-    if (el) { el.textContent = 'OneDrive: ' + msg; el.classList.remove('hidden'); }
+    const txt = document.getElementById('cacheInfoText');
+    if (txt) txt.textContent = 'OneDrive: ' + msg;
+    document.getElementById('cacheInfo')?.classList.remove('hidden');
     console.log('[OneDrive]', msg);
   };
 
@@ -448,7 +449,7 @@ async function fetchEmails(since, top = 100) {
       _contactEmail = result[0].fromEmail;
     }
 
-    showDiag(`js:20260629l | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
+    showDiag(`js:20260629m | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {

@@ -1,4 +1,4 @@
-/* Tembu Contact Intelligence – detail.js v20260629f */
+/* Tembu Contact Intelligence – detail.js v20260629l */
 
 const SESSION_KEY   = '@tembu_outlook_session';
 const DIALOG_TK_KEY = '@tembu_dialog_token';
@@ -448,7 +448,7 @@ async function fetchEmails(since, top = 100) {
       _contactEmail = result[0].fromEmail;
     }
 
-    showDiag(`js:20260622b | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
+    showDiag(`js:20260629l | E-Mail: ${diagMode} | roh:${diagRaw} → gefiltert:${diagFiltered} | name="${_contactName}" email="${_contactEmail || '—'}" | seit:${sinceDate}`);
 
     return result.sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) {

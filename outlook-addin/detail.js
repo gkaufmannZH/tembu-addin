@@ -203,12 +203,44 @@ function isLocalProvider(provider) {
 
 // ── OneDrive cache (dünne Wrapper über TCore.saveAnalysis / loadAnalysis) ─
 async function saveToOneDrive(analysis) {
+  const odLog = (msg) => {
+    const el = document.getElementById('cacheInfo');
+    if (el) { el.textContent = 'OneDrive: ' + msg; el.classList.remove('hidden'); }
+    console.log('[OneDrive]', msg);
+  };
+
+  odLog('Start — Token: ' + (_token ? _token.slice(0, 12) + '…' : 'KEIN TOKEN'));
+  odLog('CacheKey: ' + _cacheKey);
+  odLog('Pfad: ' + TCore.analysisOneDrivePath(_cacheKey));
+
   try {
-    await TCore.saveAnalysis(_token, _cacheKey, _contactName, _contactEmail, analysis);
+    odLog('Erstelle Ordner…');
+    // Ordner manuell anlegen mit sichtbarem Ergebnis
+    const mkR1 = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Tembu', folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+    });
+    odLog('Tembu-Ordner: ' + mkR1.status);
+
+    const mkR2 = await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/Tembu:/children', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'analysen', folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+    });
+    odLog('analysen-Ordner: ' + mkR2.status);
+
+    odLog('Schreibe JSON…');
+    const putPath = TCore.analysisOneDrivePath(_cacheKey);
+    const putRes = await fetch('https://graph.microsoft.com/v1.0' + putPath, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact: _contactName, email: _contactEmail, savedAt: new Date().toISOString(), analysis }),
+    });
+    const putBody = await putRes.text();
+    odLog('PUT ' + putRes.status + (putRes.ok ? ' ✓ gespeichert' : ': ' + putBody.slice(0, 120)));
   } catch (e) {
-    const ci = document.getElementById('cacheInfo');
-    if (ci) ci.textContent = 'OneDrive: ' + (e.message || String(e));
-    console.warn('OneDrive save:', e.message);
+    odLog('FEHLER: ' + (e.message || String(e)));
   }
 }
 

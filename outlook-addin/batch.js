@@ -39,8 +39,41 @@ window.addEventListener('DOMContentLoaded', async () => {
       '<span class="folder-loading" style="color:#c00">Fehler: Kein Token. Bitte über die Taskpane öffnen.</span>';
     return;
   }
+  loadAIConfig();
   await loadFolders();
 });
+
+// ── AI settings UI ────────────────────────────────────────────────────────────
+const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio']);
+
+function loadAIConfig() {
+  const provider  = localStorage.getItem('tembu_provider')  || 'ollama';
+  const apiKey    = localStorage.getItem('tembu_apikey')    || '';
+  const endpoint  = localStorage.getItem('tembu_endpoint')  || 'http://localhost:11434';
+  const model     = localStorage.getItem('tembu_model')     || 'qwen2.5:14b';
+  document.getElementById('providerSelect').value  = provider;
+  document.getElementById('apiKeyInput').value     = apiKey;
+  document.getElementById('localEndpoint').value   = endpoint;
+  document.getElementById('localModel').value      = model;
+  onProviderChange();
+}
+
+function saveAIConfig() {
+  const provider = document.getElementById('providerSelect').value;
+  localStorage.setItem('tembu_provider',  provider);
+  localStorage.setItem('tembu_apikey',    document.getElementById('apiKeyInput').value.trim());
+  localStorage.setItem('tembu_endpoint',  document.getElementById('localEndpoint').value.trim());
+  localStorage.setItem('tembu_model',     document.getElementById('localModel').value.trim());
+  document.getElementById('actionHint').textContent = 'KI gespeichert ✓';
+  setTimeout(() => updateStartButton(), 1500);
+}
+
+function onProviderChange() {
+  const isLocal = LOCAL_PROVIDERS.has(document.getElementById('providerSelect').value);
+  document.getElementById('apiKeyInput').classList.toggle('hidden', isLocal);
+  document.getElementById('localEndpoint').classList.toggle('hidden', !isLocal);
+  document.getElementById('localModel').classList.toggle('hidden', !isLocal);
+}
 
 // ── Load and render folder list ───────────────────────────────────────────────
 async function loadFolders() {
@@ -83,14 +116,27 @@ function renderFolderList() {
   const list = document.getElementById('folderList');
   list.innerHTML = '';
   for (let i = 0; i < _folders.length; i++) {
-    const f   = _folders[i];
-    const div = document.createElement('label');
-    div.className = 'folder-item';
-    div.innerHTML = `
-      <input type="checkbox" ${f.checked ? 'checked' : ''} onchange="toggleFolder(${i}, this.checked)" />
-      <span class="folder-name">${escHtml(f.displayName)}</span>
-      <span class="folder-count">${f.totalItemCount.toLocaleString('de-CH')}</span>`;
-    list.appendChild(div);
+    const f     = _folders[i];
+    const label = document.createElement('label');
+    label.className = 'folder-item';
+
+    const cb = document.createElement('input');
+    cb.type    = 'checkbox';
+    cb.checked = f.checked;
+    cb.addEventListener('change', () => toggleFolder(i, cb.checked));
+
+    const name  = document.createElement('span');
+    name.className   = 'folder-name';
+    name.textContent = f.displayName;
+
+    const count = document.createElement('span');
+    count.className   = 'folder-count';
+    count.textContent = f.totalItemCount.toLocaleString('de-CH');
+
+    label.appendChild(cb);
+    label.appendChild(name);
+    label.appendChild(count);
+    list.appendChild(label);
   }
 }
 
@@ -273,18 +319,17 @@ Wichtig: Im "interactions"-Array jedes Themas ALLE zugehörigen Interaktionen au
 }`;
 }
 
-// ── AI config (same localStorage keys as detail.js) ──────────────────────────
+// ── AI config ─────────────────────────────────────────────────────────────────
 function getAIConfig() {
-  const provider = localStorage.getItem('tembu_provider') || 'gemini';
   return {
-    provider,
-    apiKey:   localStorage.getItem('tembu_apikey')   || '',
-    endpoint: localStorage.getItem('tembu_endpoint') || 'http://localhost:11434',
-    model:    localStorage.getItem('tembu_model')    || '',
+    provider: localStorage.getItem('tembu_provider')  || 'ollama',
+    apiKey:   localStorage.getItem('tembu_apikey')    || '',
+    endpoint: localStorage.getItem('tembu_endpoint')  || 'http://localhost:11434',
+    model:    localStorage.getItem('tembu_model')     || 'qwen2.5:14b',
   };
 }
 
-function isLocalProvider(p) { return p === 'ollama' || p === 'lmstudio'; }
+function isLocalProvider(p) { return LOCAL_PROVIDERS.has(p); }
 
 function isRecent(savedAt) {
   if (!savedAt) return false;

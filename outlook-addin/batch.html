@@ -82,9 +82,24 @@
     <div class="header-sub">Kontakte aus gewählten Ordnern analysieren und in OneDrive speichern</div>
   </div>
 
-  <!-- Zeitraum + folder selection -->
+  <!-- KI-Einstellungen -->
   <div class="setup">
     <div class="setup-row">
+      <span class="setup-label">KI</span>
+      <select id="providerSelect" onchange="onProviderChange()">
+        <option value="ollama">Ollama (lokal)</option>
+        <option value="lmstudio">LM Studio</option>
+        <option value="gemini">Gemini</option>
+        <option value="anthropic">Claude</option>
+        <option value="openai">OpenAI</option>
+        <option value="groq">Groq</option>
+      </select>
+      <input id="apiKeyInput" type="password" placeholder="API Key" style="border:1.5px solid #ddd;border-radius:8px;padding:7px 10px;font-size:12px;flex:1;min-width:0;font-family:inherit;outline:none" class="hidden" />
+      <input id="localEndpoint" type="text" placeholder="http://localhost:11434" style="border:1.5px solid #ddd;border-radius:8px;padding:7px 10px;font-size:12px;width:180px;font-family:inherit;outline:none" />
+      <input id="localModel" type="text" placeholder="qwen2.5:14b" style="border:1.5px solid #ddd;border-radius:8px;padding:7px 10px;font-size:12px;width:120px;font-family:inherit;outline:none" />
+      <button onclick="saveAIConfig()" style="background:#2d5a5a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer">OK</button>
+    </div>
+    <div class="setup-row" style="margin-top:6px">
       <span class="setup-label">Zeitraum</span>
       <select id="sinceSelect">
         <option value="3">3 Monate</option>
@@ -95,7 +110,7 @@
         <option value="0">Alles</option>
       </select>
     </div>
-    <div style="font-size:11px;color:#aaa">Analysierte Kontakte < 24h werden übersprungen · Ollama: ~30–60s/Kontakt</div>
+    <div style="font-size:11px;color:#aaa;margin-top:6px">Analysierte Kontakte &lt; 24h werden übersprungen · Ollama: ~30–60s/Kontakt</div>
   </div>
 
   <!-- Folder picker -->

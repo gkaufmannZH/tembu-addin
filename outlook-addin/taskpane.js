@@ -2,7 +2,7 @@
 
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const AUTH_URL     = 'https://gkaufmannzh.github.io/tembu.app/outlook-addin/auth.html';
-const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read'];
+const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read', 'Files.ReadWrite'];
 const TEMBU_LIST   = 'Tembu';
 const SESSION_KEY  = '@tembu_outlook_session';
 

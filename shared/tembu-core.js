@@ -46,9 +46,12 @@ const TCore = (() => {
   // ── Analyse-Cache (OneDrive) ──────────────────────────────────────────────
   // Jeder Nutzer speichert in eigenem OneDrive/Tembu/analysen/ → keine geteilte DB nötig
   function analysisOneDrivePath(cacheKey) {
-    const safe = String(cacheKey).replace(/[^a-z0-9@._-]/g, '-').replace(/-+/g, '-').slice(0, 80);
-    const encoded = safe.replace(/@/g, '%40'); // @ ist OData-Sonderzeichen → muss encoded werden
-    return `/me/drive/root:/Tembu/analysen/${encoded}.json:/content`;
+    const safe = String(cacheKey)
+      .replace(/@/g, '-at-')             // @ ist OData-Sonderzeichen → auch %40 reicht nicht
+      .replace(/[^a-z0-9._-]/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 80);
+    return `/me/drive/root:/Tembu/analysen/${safe}.json:/content`;
   }
 
   async function ensureOneDriveFolders(token) {

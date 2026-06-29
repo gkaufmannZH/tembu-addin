@@ -1,4 +1,4 @@
-/* Tembu Contact Intelligence – detail.js v20260622 */
+/* Tembu Contact Intelligence – detail.js v20260629c */
 
 const SESSION_KEY   = '@tembu_outlook_session';
 const DIALOG_TK_KEY = '@tembu_dialog_token';
@@ -317,7 +317,7 @@ async function fetchEmails(since) {
   if (!_contactEmail && !_contactName) return [];
   const s   = since.toISOString();
   const enc = encodeURIComponent;
-  const selEmail = '$select=id,subject,receivedDateTime,sentDateTime,from,toRecipients,bodyPreview';
+  const selEmail = '$select=id,subject,receivedDateTime,sentDateTime,from,toRecipients,bodyPreview,webLink';
   const sinceDate = s.slice(0, 10);
   let diagMode = '', diagRaw = 0, diagFiltered = 0;
   try {
@@ -364,7 +364,8 @@ async function fetchEmails(since) {
       result.push({ id: m.id, date, type: 'email', direction: 'received',
         subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200),
         fromEmail: m.from?.emailAddress?.address || '',
-        fromName:  m.from?.emailAddress?.name    || '' });
+        fromName:  m.from?.emailAddress?.name    || '',
+        url: m.webLink || '' });
     }
     for (const m of sentItems) {
       const date = (m.sentDateTime || '').slice(0, 10);
@@ -374,7 +375,8 @@ async function fetchEmails(since) {
         if (!toNames.some(n => n.includes(nameLower))) continue;
       }
       result.push({ id: m.id, date, type: 'email', direction: 'sent',
-        subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200) });
+        subject: m.subject || '(kein Betreff)', preview: (m.bodyPreview || '').slice(0, 200),
+        url: m.webLink || '' });
     }
     diagFiltered = result.length;
 
@@ -421,6 +423,7 @@ async function fetchMeetings(since) {
       duration: (e.start?.dateTime && e.end?.dateTime)
         ? Math.round((new Date(e.end.dateTime) - new Date(e.start.dateTime)) / 60000) : 0,
       preview: (e.bodyPreview || '').slice(0, 200),
+      url: e.webLink || '',
     })).sort((a, b) => b.date.localeCompare(a.date));
   } catch (e) { console.warn('fetchMeetings:', e.message); return []; }
 }
@@ -631,6 +634,14 @@ function toggleThemeDetail(el) {
   el.querySelector('.theme-toggle-arrow').textContent = open ? '▼' : '▶';
 }
 
+function findInteraction(item) {
+  if (!_rawData) return null;
+  const pool = item.type === 'meeting' ? _rawData.meetings : _rawData.emails;
+  const subj = (item.subject || '').toLowerCase().slice(0, 30);
+  return pool.find(e => e.date === item.date && (e.subject || '').toLowerCase().includes(subj))
+      || pool.find(e => e.date === item.date);
+}
+
 function renderThemes(themes) {
   const el = document.getElementById('themesContent');
   if (!themes?.length) { renderThemesEmpty(); return; }
@@ -639,12 +650,17 @@ function renderThemes(themes) {
     const stx = t.status === 'offen' ? 'offen' : 'abgeschlossen';
     const items = (t.interactions || []);
     const detailHtml = items.map(i => {
-      const icon = i.type === 'meeting' ? '📅' : '✉';
-      return `<div class="theme-interaction"><span class="ti-icon">${icon}</span><span class="ti-date">${esc(i.date || '')}</span><span class="ti-subject">${esc(i.subject || '')}</span></div>`;
+      const icon   = i.type === 'meeting' ? '📅' : '✉';
+      const match  = findInteraction(i);
+      const inner  = `<span class="ti-icon">${icon}</span><span class="ti-date">${esc(i.date || '')}</span><span class="ti-subject">${esc(i.subject || '')}</span>`;
+      return match?.url
+        ? `<a class="theme-interaction ti-link" href="${esc(match.url)}" target="_blank">${inner}</a>`
+        : `<div class="theme-interaction">${inner}</div>`;
     }).join('');
+    const count = items.length || t.count || 0;
     const countEl = items.length
-      ? `<span class="theme-count theme-count-toggle" onclick="toggleThemeDetail(this)">${t.count || items.length} Interaktionen <span class="theme-toggle-arrow">▶</span></span>`
-      : `<span class="theme-count">${t.count || ''} Interaktionen</span>`;
+      ? `<span class="theme-count theme-count-toggle" onclick="toggleThemeDetail(this)">${count} Interaktionen <span class="theme-toggle-arrow">▶</span></span>`
+      : `<span class="theme-count">${count} Interaktionen</span>`;
     return `<div class="theme-card">
       <div class="theme-header">
         <span class="theme-name">${esc(t.name)}</span>

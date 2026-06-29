@@ -203,8 +203,13 @@ function isLocalProvider(provider) {
 
 // ── OneDrive cache (dünne Wrapper über TCore.saveAnalysis / loadAnalysis) ─
 async function saveToOneDrive(analysis) {
-  try { await TCore.saveAnalysis(_token, _cacheKey, _contactName, _contactEmail, analysis); }
-  catch (e) { console.warn('OneDrive save:', e.message); }
+  try {
+    await TCore.saveAnalysis(_token, _cacheKey, _contactName, _contactEmail, analysis);
+  } catch (e) {
+    const ci = document.getElementById('cacheInfo');
+    if (ci) ci.textContent = 'OneDrive: ' + (e.message || String(e));
+    console.warn('OneDrive save:', e.message);
+  }
 }
 
 async function loadFromOneDrive() {

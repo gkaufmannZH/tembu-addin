@@ -1,4 +1,4 @@
-/* Tembu Contact Intelligence – detail.js v20260629d */
+/* Tembu Contact Intelligence – detail.js v20260629f */
 
 const SESSION_KEY   = '@tembu_outlook_session';
 const DIALOG_TK_KEY = '@tembu_dialog_token';
@@ -8,6 +8,7 @@ const STORE_NAME    = 'contact_analyses';
 const TEMBU_LIST    = 'Tembu';
 const SINCE_MONTHS_KEY     = 'tembu_since_months';
 const SINCE_MONTHS_DEFAULT = 24;
+const HISTORY_MONTHS_KEY   = 'tembu_history_months';
 const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;
 
 const AI_PROVIDER_KEY = 'tembu_ai_provider';
@@ -201,6 +202,16 @@ function isLocalProvider(provider) {
   return provider === 'ollama' || provider === 'lmstudio';
 }
 
+// ── OneDrive cache (dünne Wrapper über TCore.saveAnalysis / loadAnalysis) ─
+async function saveToOneDrive(analysis) {
+  try { await TCore.saveAnalysis(_token, _cacheKey, _contactName, _contactEmail, analysis); }
+  catch (e) { console.warn('OneDrive save:', e.message); }
+}
+
+async function loadFromOneDrive() {
+  return TCore.loadAnalysis(_token, _cacheKey);
+}
+
 // ── IndexedDB cache ───────────────────────────────────────────────────────
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -291,6 +302,22 @@ async function loadData(force) {
     return;
   }
 
+  // Kein lokaler Cache → OneDrive versuchen
+  if (!force) {
+    const cloud = await loadFromOneDrive();
+    if (cloud?.analysis) {
+      await saveCache(_cacheKey, { analysis: cloud.analysis, rawData: _rawData });
+      const ageH = Math.round((Date.now() - new Date(cloud.savedAt).getTime()) / 3600000);
+      document.getElementById('cacheInfoText').textContent =
+        `KI-Analyse von vor ${ageH < 1 ? '< 1' : ageH} Stunde${ageH !== 1 ? 'n' : ''} (Cloud)`;
+      document.getElementById('cacheInfo').classList.remove('hidden');
+      renderAiAnalysis(cloud.analysis);
+      renderThemes(cloud.analysis.themes || []);
+      renderBackground(cloud.analysis.background || '');
+      return;
+    }
+  }
+
   await runAI(_rawData);
 }
 
@@ -298,6 +325,47 @@ async function forceRefresh() {
   _rawData = null;
   document.getElementById('cacheInfo').classList.add('hidden');
   await loadData(true);
+}
+
+async function loadHistory() {
+  const btn    = document.getElementById('btnHistory');
+  const status = document.getElementById('historyStatus');
+  const months = parseInt(document.getElementById('historySelect').value || '60');
+  const since  = months === 0 ? new Date('2000-01-01') : new Date(Date.now() - months * 30.44 * 24 * 60 * 60 * 1000);
+
+  btn.disabled = true;
+  status.textContent = 'Lade…';
+  localStorage.setItem(HISTORY_MONTHS_KEY, String(months));
+
+  try {
+    const [oldEmails, oldMeetings] = await Promise.all([
+      fetchEmails(since, 250),
+      fetchMeetings(since, 150),
+    ]);
+
+    const seenE = new Set((_rawData?.emails   || []).map(e => e.id).filter(Boolean));
+    const seenM = new Set((_rawData?.meetings || []).map(m => m.id).filter(Boolean));
+    const newE  = oldEmails.filter(e   => !e.id || !seenE.has(e.id));
+    const newM  = oldMeetings.filter(m => !m.id || !seenM.has(m.id));
+
+    _rawData = {
+      emails:   [...(_rawData?.emails   || []), ...newE].sort((a, b) => b.date.localeCompare(a.date)),
+      meetings: [...(_rawData?.meetings || []), ...newM].sort((a, b) => b.date.localeCompare(a.date)),
+      rumbles:  _rawData?.rumbles || [],
+    };
+
+    const added = newE.length + newM.length;
+    status.textContent = added > 0 ? `+${added} neue gefunden` : 'Keine weiteren gefunden';
+
+    renderStats(_rawData);
+    renderTimeline(_rawData);
+    updateHeader(_rawData);
+    await runAI(_rawData);
+  } catch (e) {
+    status.textContent = 'Fehler: ' + (e.message || '').slice(0, 50);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── Graph helper (thin wrapper mit 403-Spezialbehandlung) ─────────────────
@@ -313,7 +381,7 @@ async function gFetch(path) {
 }
 
 // ── Fetch emails ──────────────────────────────────────────────────────────
-async function fetchEmails(since) {
+async function fetchEmails(since, top = 100) {
   if (!_contactEmail && !_contactName) return [];
   const s   = since.toISOString();
   const enc = encodeURIComponent;
@@ -326,14 +394,14 @@ async function fetchEmails(since) {
       diagMode = 'email-search';
       const qFrom = enc('"from:' + _contactEmail + '"');
       const qTo   = enc('"to:'   + _contactEmail + '"');
-      inboxReq = gFetch(`/me/messages?$search=${qFrom}&${selEmail}&$top=100`);
-      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${qTo}&${selEmail}&$top=100`);
+      inboxReq = gFetch(`/me/messages?$search=${qFrom}&${selEmail}&$top=${top}`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${qTo}&${selEmail}&$top=${top}`);
     } else {
       diagMode = 'name-search';
       const cleanName = _contactName.replace(/^(Herr|Frau|Hr\.|Fr\.|Dr\.|Prof\.|Ing\.|Mag\.)\s+/i, '').trim();
       const q = enc('"' + cleanName + '"');
-      inboxReq = gFetch(`/me/messages?$search=${q}&${selEmail}&$top=100`);
-      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${q}&${selEmail}&$top=100`);
+      inboxReq = gFetch(`/me/messages?$search=${q}&${selEmail}&$top=${top}`);
+      sentReq  = gFetch(`/me/mailFolders/SentItems/messages?$search=${q}&${selEmail}&$top=${top}`);
     }
     const [inbox, sent] = await Promise.allSettled([inboxReq, sentReq]);
     const result = [];
@@ -405,7 +473,7 @@ function showDiag(msg) {
 }
 
 // ── Fetch meetings ────────────────────────────────────────────────────────
-async function fetchMeetings(since) {
+async function fetchMeetings(since, top = 100) {
   if (!_contactEmail && !_contactName) return [];
   const s   = since.toISOString();
   const now = new Date().toISOString();
@@ -415,7 +483,7 @@ async function fetchMeetings(since) {
     : `attendees/any(a:a/emailAddress/name eq '${_contactName}')`;
   try {
     const data = await gFetch(
-      `/me/calendarView?startDateTime=${enc(s)}&endDateTime=${enc(now)}&$filter=${enc(filter)}&$select=id,subject,start,end,bodyPreview&$top=100`
+      `/me/calendarView?startDateTime=${enc(s)}&endDateTime=${enc(now)}&$filter=${enc(filter)}&$select=id,subject,start,end,bodyPreview&$top=${top}`
     );
     return (data.value || []).map(e => ({
       id: e.id, type: 'meeting', date: (e.start?.dateTime || '').slice(0, 10),
@@ -473,6 +541,7 @@ async function runAI(data) {
     renderBackground(parsed.background || '');
     showContent();
     await saveCache(_cacheKey, { analysis: parsed, rawData: data });
+    saveToOneDrive(parsed); // fire and forget — cross-device sync
     document.getElementById('cacheInfoText').textContent = 'Gerade analysiert';
     document.getElementById('cacheInfo').classList.remove('hidden');
   } catch (e) {

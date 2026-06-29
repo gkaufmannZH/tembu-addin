@@ -33,6 +33,40 @@ const TCore = (() => {
     if (!res.ok) throw new Error(`Graph PATCH ${res.status} ${path}`);
   }
 
+  async function graphPut(token, path, body) {
+    const res = await fetch(GRAPH_BASE + path, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Graph PUT ${res.status} ${path}`);
+    return res.json().catch(() => null);
+  }
+
+  // ── Analyse-Cache (OneDrive) ──────────────────────────────────────────────
+  // Jeder Nutzer speichert in eigenem OneDrive/Tembu/analysen/ → keine geteilte DB nötig
+  function analysisOneDrivePath(cacheKey) {
+    const safe = String(cacheKey).replace(/[^a-z0-9@._-]/g, '-').replace(/-+/g, '-').slice(0, 80);
+    return `/me/drive/root:/Tembu/analysen/${safe}.json:/content`;
+  }
+
+  async function saveAnalysis(token, cacheKey, contactName, contactEmail, analysis) {
+    await graphPut(token, analysisOneDrivePath(cacheKey), JSON.stringify({
+      contact: contactName, email: contactEmail,
+      savedAt: new Date().toISOString(), analysis,
+    }));
+  }
+
+  async function loadAnalysis(token, cacheKey) {
+    try {
+      const res = await fetch(GRAPH_BASE + analysisOneDrivePath(cacheKey), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch { return null; }
+  }
+
   // ── To Do / Rumbles ───────────────────────────────────────────────────────
   function parseBody(text) {
     const r = {};
@@ -157,6 +191,10 @@ const TCore = (() => {
     graphGet,
     graphPost,
     graphPatch,
+    graphPut,
+    analysisOneDrivePath,
+    saveAnalysis,
+    loadAnalysis,
     parseBody,
     getOrCreateTembuList,
     fetchRumbleTasks,

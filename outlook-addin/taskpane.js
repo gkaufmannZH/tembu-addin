@@ -791,7 +791,7 @@ function openDetailDialog() {
   if (!contactName) { showStatus('Bitte zuerst einen Kontakt auswählen.', 'error'); return; }
 
   // Dialog-localStorage ist in Outlook Desktop isoliert → Token direkt im URL-Parameter übergeben
-  const params = new URLSearchParams({ name: contactName, email: _contactEmail || '', t: _token || '', _v: '20260629h' });
+  const params = new URLSearchParams({ name: contactName, email: _contactEmail || '', t: _token || '', _v: '20260629i' });
   const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/detail.html?${params.toString()}`;
 
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
@@ -818,7 +818,7 @@ function openCompanyDialog() {
 }
 
 function openBatchDialog() {
-  const params = new URLSearchParams({ t: _token || '', _v: '20260629h' });
+  const params = new URLSearchParams({ t: _token || '', _v: '20260629i' });
   const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/batch.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {

@@ -50,7 +50,25 @@ const TCore = (() => {
     return `/me/drive/root:/Tembu/analysen/${safe}.json:/content`;
   }
 
+  async function ensureOneDriveFolders(token) {
+    // OneDrive erstellt Parent-Ordner nicht automatisch → einmalig anlegen
+    const mkfolder = async (path, name) => {
+      await fetch(GRAPH_BASE + path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+      }); // 409 = existiert bereits → ignorieren
+    };
+    await mkfolder('/me/drive/root/children', 'Tembu');
+    await mkfolder('/me/drive/root:/Tembu:/children', 'analysen');
+  }
+
+  let _foldersEnsured = false;
   async function saveAnalysis(token, cacheKey, contactName, contactEmail, analysis) {
+    if (!_foldersEnsured) {
+      await ensureOneDriveFolders(token);
+      _foldersEnsured = true;
+    }
     await graphPut(token, analysisOneDrivePath(cacheKey), JSON.stringify({
       contact: contactName, email: contactEmail,
       savedAt: new Date().toISOString(), analysis,

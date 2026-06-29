@@ -88,6 +88,7 @@ function resetItemContext() {
     if (el) el.value = '';
   });
   document.getElementById('btnOpenDetail')?.classList.add('hidden');
+  document.getElementById('btnOpenCompany')?.classList.add('hidden');
   ['participantPicker', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
@@ -365,6 +366,7 @@ function selectContactFromPicker(name, phone, email) {
   const searchEl = document.getElementById('contactPickerSearch');
   if (searchEl) searchEl.value = '';
   document.getElementById('btnOpenDetail')?.classList.remove('hidden');
+  updateCompanyButton();
   document.getElementById('rumbleText')?.focus();
 }
 
@@ -770,6 +772,19 @@ function wireEvents() {
   document.getElementById('contactName').addEventListener('change', e => onContactNameChange(e.target.value));
 }
 
+const PERSONAL_DOMAINS = new Set([
+  'gmail.com','googlemail.com','hotmail.com','hotmail.de','hotmail.ch',
+  'outlook.com','outlook.de','outlook.ch','yahoo.com','yahoo.de','yahoo.ch',
+  'live.com','icloud.com','me.com','protonmail.com','proton.me','aol.com',
+  'gmx.ch','gmx.de','gmx.net','bluewin.ch','hispeed.ch','sunrise.ch',
+]);
+
+function updateCompanyButton() {
+  const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
+  const show   = !!domain && !PERSONAL_DOMAINS.has(domain);
+  document.getElementById('btnOpenCompany')?.classList.toggle('hidden', !show);
+}
+
 // ── Contact Intelligence Detail Dialog ───────────────────────────────────
 function openDetailDialog() {
   const contactName = document.getElementById('contactName')?.value?.trim();
@@ -783,6 +798,20 @@ function openDetailDialog() {
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {
         showStatus('Detail-Fenster konnte nicht geöffnet werden.', 'error');
+      }
+    }
+  );
+}
+
+function openCompanyDialog() {
+  const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
+  if (!domain) { showStatus('Keine Firmen-Domain erkannt.', 'error'); return; }
+  const params = new URLSearchParams({ domain, t: _token || '', _v: '20260629f' });
+  const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/company.html?${params.toString()}`;
+  Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
+    result => {
+      if (result.status === Office.AsyncResultStatus.Failed) {
+        showStatus('Firma-Fenster konnte nicht geöffnet werden.', 'error');
       }
     }
   );

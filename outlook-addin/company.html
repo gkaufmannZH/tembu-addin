@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tembu Firma</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1a1a1a; font-size: 14px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    .header { background: #2d5a5a; color: #fff; padding: 14px 20px 12px; flex-shrink: 0; }
+    .header-name { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .header-domain { font-size: 11px; background: rgba(255,255,255,0.18); border-radius: 4px; padding: 2px 7px; font-weight: 400; }
+    .header-meta { font-size: 12px; opacity: 0.82; margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .header-meta span { white-space: nowrap; }
+
+    .settings-bar { background: #f8f8f8; border-bottom: 1px solid #e8e8e8; padding: 7px 20px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+    .settings-label { font-size: 11px; color: #666; white-space: nowrap; font-weight: 600; }
+    .settings-input { flex: 1; min-width: 180px; border: 1.5px solid #ddd; border-radius: 6px; padding: 5px 9px; font-size: 12px; color: #333; background: #fff; outline: none; font-family: inherit; }
+    .settings-input:focus { border-color: #2d5a5a; }
+    .settings-btn { background: #2d5a5a; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; font-weight: 600; }
+    .settings-btn:hover { opacity: 0.88; }
+    .settings-link { font-size: 11px; color: #2d5a5a; text-decoration: none; white-space: nowrap; }
+
+    .history-bar { background: #fffbf0; border-bottom: 1px solid #e8dfc0; padding: 6px 20px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+    .history-label { font-size: 11px; color: #7a5c00; font-weight: 600; white-space: nowrap; }
+    .history-status { font-size: 11px; color: #888; }
+
+    .tab-bar { display: flex; border-bottom: 2px solid #eee; padding: 0 20px; flex-shrink: 0; }
+    .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; padding: 9px 14px; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; margin-bottom: -2px; transition: color 0.15s; }
+    .tab-btn.active { color: #2d5a5a; border-bottom-color: #2d5a5a; }
+    .tab-btn:hover { color: #2d5a5a; }
+
+    .tab-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+    .stats-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .stat-box { flex: 1; min-width: 70px; background: #f0f5f5; border-radius: 8px; padding: 10px 12px; text-align: center; }
+    .stat-num { font-size: 22px; font-weight: 700; color: #2d5a5a; }
+    .stat-lbl { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+
+    .cache-info { background: #f0f5f5; border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 12px; color: #2d5a5a; }
+    .cache-refresh { background: none; border: none; color: #2d5a5a; font-size: 12px; cursor: pointer; text-decoration: underline; }
+
+    /* Timeline */
+    .tl-item { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f5f5f5; align-items: baseline; flex-wrap: wrap; }
+    .tl-item:last-child { border-bottom: none; }
+    .tl-icon { flex-shrink: 0; font-size: 12px; }
+    .tl-date { color: #aaa; font-size: 11px; flex-shrink: 0; min-width: 72px; }
+    .tl-contact { font-size: 11px; color: #2d5a5a; font-weight: 600; flex-shrink: 0; min-width: 100px; }
+    .tl-subject { flex: 1; font-size: 13px; color: #333; }
+    .tl-link { flex-shrink: 0; font-size: 11px; color: #2d5a5a; text-decoration: none; opacity: 0.6; }
+    .tl-link:hover { opacity: 1; text-decoration: underline; }
+
+    /* Themes */
+    .theme-card { border: 1px solid #e8e8e8; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+    .theme-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .theme-name { font-weight: 700; font-size: 14px; flex: 1; }
+    .theme-contacts { font-size: 11px; color: #2d5a5a; background: #e8f0f0; border-radius: 4px; padding: 2px 7px; }
+    .theme-count { font-size: 11px; color: #888; cursor: pointer; white-space: nowrap; }
+    .theme-count-toggle:hover { color: #2d5a5a; }
+    .theme-toggle-arrow { font-size: 9px; }
+    .theme-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+    .s-open { background: #fff3e0; color: #c67000; }
+    .s-done { background: #e8f5e8; color: #2d6a2d; }
+    .theme-summary { font-size: 12px; color: #555; line-height: 1.5; }
+    .theme-interactions { margin-top: 8px; border-top: 1px solid #e8e8e8; padding-top: 6px; }
+    .theme-interaction { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 12px; color: #444; }
+    a.ti-link { text-decoration: none; color: inherit; border-radius: 4px; }
+    a.ti-link:hover { background: #f0f5f5; }
+    a.ti-link:hover .ti-subject { text-decoration: underline; color: #2d5a5a; }
+    .ti-icon { flex-shrink: 0; font-size: 11px; }
+    .ti-date { color: #aaa; flex-shrink: 0; font-size: 11px; min-width: 72px; }
+    .ti-contact { color: #2d5a5a; font-size: 11px; font-weight: 600; flex-shrink: 0; min-width: 90px; }
+    .ti-subject { flex: 1; }
+
+    /* Contacts tab */
+    .contact-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+    .contact-row:last-child { border-bottom: none; }
+    .contact-row-avatar { width: 34px; height: 34px; border-radius: 50%; background: #2d5a5a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+    .contact-row-info { flex: 1; min-width: 0; }
+    .contact-row-name { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+    .contact-row-email { font-size: 11px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact-row-count { font-size: 11px; color: #666; flex-shrink: 0; }
+    .contact-row-link { font-size: 12px; color: #2d5a5a; text-decoration: none; background: #f0f5f5; border-radius: 6px; padding: 4px 9px; flex-shrink: 0; font-weight: 600; }
+    .contact-row-link:hover { background: #e0eded; }
+
+    /* Summary */
+    .summary-box { background: #f8f8f8; border-radius: 10px; padding: 14px 16px; line-height: 1.75; font-size: 13px; color: #333; margin-bottom: 14px; }
+    .open-points { list-style: none; }
+    .open-points li { padding: 5px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; gap: 8px; }
+    .open-points li:last-child { border-bottom: none; }
+    .open-points li::before { content: '●'; color: #c67000; flex-shrink: 0; }
+    .next-step { background: #f0f5f5; border-left: 3px solid #2d5a5a; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; color: #333; margin-top: 14px; }
+
+    /* No key / error */
+    .no-key-box { background: #f8f8f8; border-radius: 12px; padding: 24px; text-align: center; }
+    .no-key-icon { font-size: 32px; margin-bottom: 8px; }
+    .no-key-title { font-size: 15px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+    .no-key-desc { font-size: 12px; color: #666; line-height: 1.6; }
+    .no-key-btn { margin-top: 12px; display: inline-block; background: #2d5a5a; color: #fff; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; font-family: inherit; }
+
+    .error-box { background: #fde8e8; color: #9b2020; border-radius: 10px; padding: 16px; font-size: 13px; }
+    .loading-box { color: #888; font-size: 13px; padding: 20px 0; text-align: center; }
+    .empty-state { color: #aaa; font-size: 13px; text-align: center; padding: 30px 0; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-name">
+      <span id="headerName">…</span>
+      <span class="header-domain" id="headerDomain"></span>
+      <span style="font-size:10px;opacity:0.5;font-weight:400;margin-left:auto">v20260629f</span>
+    </div>
+    <div class="header-meta" id="headerMeta"></div>
+  </div>
+
+  <div class="settings-bar">
+    <span class="settings-label">KI</span>
+    <select class="settings-input" id="providerSelect" style="flex:0;min-width:0;width:auto;padding:4px 6px">
+      <option value="gemini">Gemini</option>
+      <option value="anthropic">Claude</option>
+      <option value="groq">Groq</option>
+      <option value="openai">OpenAI</option>
+      <option value="ollama">Ollama (lokal)</option>
+      <option value="lmstudio">LM Studio</option>
+    </select>
+    <input type="password" class="settings-input" id="apiKeyInput" placeholder="API Key" autocomplete="off" />
+    <button class="settings-btn" id="btnSaveKey">OK</button>
+    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link" id="geminiLink">Gratis →</a>
+    <input type="text" class="settings-input hidden" id="localEndpoint" placeholder="http://localhost:11434" autocomplete="off" style="max-width:180px" />
+    <input type="text" class="settings-input hidden" id="localModel" placeholder="Modell wählen…" list="modelList" autocomplete="off" style="max-width:160px" />
+    <datalist id="modelList">
+      <option value="qwen2.5:14b"><option value="qwen2.5:7b"><option value="llama3.2:3b"><option value="mistral:7b"><option value="phi4:14b"><option value="gemma3:12b">
+    </datalist>
+    <button class="settings-btn hidden" id="btnSaveLocal">OK</button>
+    <select class="settings-input" id="sinceSelect" style="flex:0;min-width:80px;width:auto;padding:4px 6px;margin-left:8px">
+      <option value="6">6 Monate</option>
+      <option value="12">1 Jahr</option>
+      <option value="24">2 Jahre</option>
+      <option value="60">5 Jahre</option>
+      <option value="0">Alles</option>
+    </select>
+  </div>
+
+  <div class="history-bar">
+    <span class="history-label">History</span>
+    <select class="settings-input" id="historySelect" style="flex:0;min-width:80px;width:auto;padding:4px 6px">
+      <option value="12">1 Jahr</option>
+      <option value="24">2 Jahre</option>
+      <option value="60" selected>5 Jahre</option>
+      <option value="120">10 Jahre</option>
+      <option value="0">Alles</option>
+    </select>
+    <button class="settings-btn" id="btnHistory" onclick="loadHistory()" style="background:#7a5c00">Alte Mails laden</button>
+    <span class="history-status" id="historyStatus"></span>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabBtnTimeline"  onclick="showTab('Timeline')">Zeitachse</button>
+    <button class="tab-btn"        id="tabBtnThemes"    onclick="showTab('Themes')">Themen</button>
+    <button class="tab-btn"        id="tabBtnContacts"  onclick="showTab('Contacts')">Kontakte</button>
+  </div>
+
+  <div class="tab-content hidden" id="errorBox">
+    <div class="error-box" id="errorMsg"></div>
+  </div>
+  <div class="tab-content hidden" id="loadingBox">
+    <div class="loading-box" id="loadingMsg">Wird geladen…</div>
+  </div>
+
+  <!-- Zeitachse -->
+  <div class="tab-content" id="tabTimeline">
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statContacts">–</div><div class="stat-lbl">Kontakte</div></div>
+      <div class="stat-box"><div class="stat-num" id="statEmails">–</div><div class="stat-lbl">Mails</div></div>
+      <div class="stat-box"><div class="stat-num" id="statMeetings">–</div><div class="stat-lbl">Meetings</div></div>
+    </div>
+    <div class="cache-info hidden" id="cacheInfo">
+      <span id="cacheInfoText"></span>
+      <button class="cache-refresh" onclick="forceRefresh()">↻ Neu analysieren</button>
+    </div>
+    <div class="summary-box hidden" id="summaryBox">
+      <div id="summaryText"></div>
+      <ul class="open-points hidden" id="openPointsList"></ul>
+      <div class="next-step hidden" id="nextStep"></div>
+    </div>
+    <div id="timelineContent"><div class="loading-box">Lade Interaktionen…</div></div>
+  </div>
+
+  <!-- Themen -->
+  <div class="tab-content hidden" id="tabThemes">
+    <div id="noKeyBox" class="no-key-box hidden">
+      <div class="no-key-icon">🔑</div>
+      <div class="no-key-title">KI-Analyse verfügbar</div>
+      <div class="no-key-desc" id="noKeyDesc">KI-Key in den Einstellungen eingeben um Themen zu analysieren.</div>
+      <button class="no-key-btn" id="noKeyBtn" onclick="document.querySelector('.settings-bar').scrollIntoView()">Einstellungen öffnen</button>
+    </div>
+    <div id="themesContent"><div class="loading-box">KI analysiert…</div></div>
+  </div>
+
+  <!-- Kontakte -->
+  <div class="tab-content hidden" id="tabContacts">
+    <div id="contactsContent"><div class="loading-box">Lade Kontakte…</div></div>
+  </div>
+
+  <script src="../shared/tembu-core.js"></script>
+  <script src="company.js?v=20260629f"></script>
+</body>
+</html>

@@ -817,6 +817,18 @@ function openCompanyDialog() {
   );
 }
 
+function openBatchDialog() {
+  const params = new URLSearchParams({ t: _token || '', _v: '20260629g' });
+  const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/batch.html?${params.toString()}`;
+  Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
+    result => {
+      if (result.status === Office.AsyncResultStatus.Failed) {
+        showStatus('Batch-Fenster konnte nicht geöffnet werden.', 'error');
+      }
+    }
+  );
+}
+
 function runDiag() {
   const out = document.getElementById('diagOut');
   out.style.display = 'block';

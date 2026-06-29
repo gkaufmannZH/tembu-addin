@@ -8,7 +8,6 @@ const STORE_NAME    = 'contact_analyses';
 const TEMBU_LIST    = 'Tembu';
 const SINCE_MONTHS_KEY     = 'tembu_since_months';
 const SINCE_MONTHS_DEFAULT = 24;
-const HISTORY_MONTHS_KEY   = 'tembu_history_months';
 const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;
 
 const AI_PROVIDER_KEY = 'tembu_ai_provider';
@@ -327,46 +326,6 @@ async function forceRefresh() {
   await loadData(true);
 }
 
-async function loadHistory() {
-  const btn    = document.getElementById('btnHistory');
-  const status = document.getElementById('historyStatus');
-  const months = parseInt(document.getElementById('historySelect').value || '60');
-  const since  = months === 0 ? new Date('2000-01-01') : new Date(Date.now() - months * 30.44 * 24 * 60 * 60 * 1000);
-
-  btn.disabled = true;
-  status.textContent = 'Lade…';
-  localStorage.setItem(HISTORY_MONTHS_KEY, String(months));
-
-  try {
-    const [oldEmails, oldMeetings] = await Promise.all([
-      fetchEmails(since, 250),
-      fetchMeetings(since, 150),
-    ]);
-
-    const seenE = new Set((_rawData?.emails   || []).map(e => e.id).filter(Boolean));
-    const seenM = new Set((_rawData?.meetings || []).map(m => m.id).filter(Boolean));
-    const newE  = oldEmails.filter(e   => !e.id || !seenE.has(e.id));
-    const newM  = oldMeetings.filter(m => !m.id || !seenM.has(m.id));
-
-    _rawData = {
-      emails:   [...(_rawData?.emails   || []), ...newE].sort((a, b) => b.date.localeCompare(a.date)),
-      meetings: [...(_rawData?.meetings || []), ...newM].sort((a, b) => b.date.localeCompare(a.date)),
-      rumbles:  _rawData?.rumbles || [],
-    };
-
-    const added = newE.length + newM.length;
-    status.textContent = added > 0 ? `+${added} neue gefunden` : 'Keine weiteren gefunden';
-
-    renderStats(_rawData);
-    renderTimeline(_rawData);
-    updateHeader(_rawData);
-    await runAI(_rawData);
-  } catch (e) {
-    status.textContent = 'Fehler: ' + (e.message || '').slice(0, 50);
-  } finally {
-    btn.disabled = false;
-  }
-}
 
 // ── Graph helper (thin wrapper mit 403-Spezialbehandlung) ─────────────────
 async function gFetch(path) {

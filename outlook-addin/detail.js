@@ -68,6 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (isLocalProvider(aiConfig.provider)) {
     document.getElementById('backgroundContent').innerHTML =
       '<div class="empty-state">Hintergrund wird nach der Analyse geladen.</div>';
+    loadOllamaModels();
   }
   providerSelect.addEventListener('change', () => {
     const p = providerSelect.value;
@@ -77,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('backgroundContent').innerHTML =
         '<div class="empty-state">Hintergrund wird nach der Analyse geladen.</div>';
       document.getElementById('noKeyBox')?.classList.add('hidden');
+      loadOllamaModels();
     }
   });
   document.getElementById('btnSaveKey').addEventListener('click', onSaveKey);
@@ -111,7 +113,22 @@ function onSaveLocal() {
   const model    = document.getElementById('localModel').value.trim();
   if (endpoint) localStorage.setItem(AI_ENDPOINT_KEY, endpoint);
   if (model)    localStorage.setItem(AI_MODEL_KEY,    model);
+  loadOllamaModels();
   if (_rawData) runAI(_rawData);
+}
+
+async function loadOllamaModels() {
+  const endpoint = (document.getElementById('localEndpoint')?.value.trim())
+    || localStorage.getItem(AI_ENDPOINT_KEY)
+    || 'http://localhost:11434';
+  try {
+    const res  = await fetch(`${endpoint}/api/tags`);
+    const data = await res.json();
+    const list = document.getElementById('modelList');
+    if (list && data.models?.length) {
+      list.innerHTML = data.models.map(m => `<option value="${m.name}">`).join('');
+    }
+  } catch {}
 }
 
 function updateProviderUI(provider) {

@@ -124,7 +124,7 @@
   <!-- Header -->
   <div class="header">
     <div class="header-name" id="headerName">…</div>
-    <div class="header-meta" id="headerMeta"><span style="opacity:0.5;font-size:10px">v20260629</span></div>
+    <div class="header-meta" id="headerMeta"><span style="opacity:0.5;font-size:10px">v20260629b</span></div>
   </div>
 
   <!-- Settings: KI-Provider + Key/Endpoint + Zeitraum -->
@@ -147,10 +147,20 @@
     <input type="text" class="settings-input hidden" id="localEndpoint"
       placeholder="http://localhost:11434" autocomplete="off" style="max-width:180px" />
     <input type="text" class="settings-input hidden" id="localModel"
-      placeholder="Modell (z.B. qwen2.5:14b)" autocomplete="off" style="max-width:145px" />
+      placeholder="Modell wählen…" list="modelList" autocomplete="off" style="max-width:160px" />
+    <datalist id="modelList">
+      <option value="qwen2.5:14b">
+      <option value="qwen2.5:7b">
+      <option value="qwen2.5:3b">
+      <option value="llama3.2:3b">
+      <option value="llama3.2:1b">
+      <option value="mistral:7b">
+      <option value="phi4:14b">
+      <option value="gemma3:12b">
+      <option value="gemma3:4b">
+    </datalist>
     <button class="settings-btn hidden" id="btnSaveLocal">OK</button>
-    <span class="settings-label" style="margin-left:8px">Zeitraum</span>
-    <select class="settings-input" id="sinceSelect" style="flex:0;min-width:0;width:auto;padding:4px 6px">
+    <select class="settings-input" id="sinceSelect" style="flex:0;min-width:80px;width:auto;padding:4px 6px;margin-left:8px">
       <option value="6">6 Monate</option>
       <option value="12">1 Jahr</option>
       <option value="24">2 Jahre</option>
@@ -217,6 +227,6 @@
   </div>
 
   <script src="../shared/tembu-core.js"></script>
-  <script src="detail.js?v=20260629"></script>
+  <script src="detail.js?v=20260629b"></script>
 </body>
 </html>

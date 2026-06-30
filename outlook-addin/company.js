@@ -1,4 +1,4 @@
-/* Tembu Firma-Analyse – company.js v20260629o */
+/* Tembu Firma-Analyse – company.js v20260629p */
 
 const PERSONAL_DOMAINS = new Set([
   'gmail.com','googlemail.com','hotmail.com','hotmail.de','hotmail.ch',

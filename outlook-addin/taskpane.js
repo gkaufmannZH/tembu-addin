@@ -791,7 +791,7 @@ function openDetailDialog() {
   if (!contactName) { showStatus('Bitte zuerst einen Kontakt auswählen.', 'error'); return; }
 
   // Dialog-localStorage ist in Outlook Desktop isoliert → Token direkt im URL-Parameter übergeben
-  const params = new URLSearchParams({ name: contactName, email: _contactEmail || '', t: _token || '', _v: '20260629o' });
+  const params = new URLSearchParams({ name: contactName, email: _contactEmail || '', t: _token || '', _v: '20260629p' });
   const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/detail-open.html?${params.toString()}`;
 
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
@@ -806,7 +806,7 @@ function openDetailDialog() {
 function openCompanyDialog() {
   const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
   if (!domain) { showStatus('Keine Firmen-Domain erkannt.', 'error'); return; }
-  const params = new URLSearchParams({ domain, t: _token || '', _v: '20260629o' });
+  const params = new URLSearchParams({ domain, t: _token || '', _v: '20260629p' });
   const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/company.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
@@ -818,7 +818,7 @@ function openCompanyDialog() {
 }
 
 function openBatchDialog() {
-  const params = new URLSearchParams({ t: _token || '', _v: '20260629o' });
+  const params = new URLSearchParams({ t: _token || '', _v: '20260629p' });
   const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/batch.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {
@@ -834,11 +834,25 @@ function runDiag() {
   out.style.display = 'block';
 
   const d = Office.context.diagnostics || {};
+
+  let scopeInfo = 'Token: KEIN TOKEN';
+  if (_token) {
+    try {
+      const payload = _token.split('.')[1];
+      const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
+      const decoded = JSON.parse(atob(padded));
+      const scopes = (decoded.scp || decoded.roles || '').split(' ');
+      const hasFiles = scopes.some(s => s.toLowerCase().includes('files'));
+      scopeInfo = 'Token: ' + _token.slice(0, 12) + '…\nScopes: ' + scopes.join(', ') + '\nFiles.ReadWrite: ' + (hasFiles ? '✓ JA' : '✗ FEHLT — Abmelden + neu anmelden!');
+    } catch { scopeInfo = 'Token: Decode-Fehler'; }
+  }
+
   const info = [
     'Host: ' + (d.host || '?'),
     'Platform: ' + (d.platform || '?'),
     'Version: ' + (d.version || '?'),
     'DisplayLanguage: ' + (Office.context.displayLanguage || '?'),
+    scopeInfo,
   ].join('\n');
 
   const results = [];

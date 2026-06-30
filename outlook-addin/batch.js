@@ -1,4 +1,4 @@
-// Tembu Batch-Analyse v20260629g
+// Tembu Batch-Analyse v20260629o
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 

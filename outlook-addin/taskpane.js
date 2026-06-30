@@ -1,7 +1,7 @@
 /* globals Office, msal */
 
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
-const AUTH_URL     = 'https://gkaufmannzh.github.io/tembu.app/outlook-addin/auth.html';
+const AUTH_URL     = 'https://gkaufmannzh.github.io/tembu-addin/outlook-addin/auth.html';
 const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read', 'Files.ReadWrite'];
 const TEMBU_LIST   = 'Tembu';
 const SESSION_KEY  = '@tembu_outlook_session';
@@ -792,7 +792,7 @@ function openDetailDialog() {
 
   // Dialog-localStorage ist in Outlook Desktop isoliert → Token direkt im URL-Parameter übergeben
   const params = new URLSearchParams({ name: contactName, email: _contactEmail || '', t: _token || '', _v: '20260629q' });
-  const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/detail-open.html?${params.toString()}`;
+  const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/detail-open.html?${params.toString()}`;
 
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
@@ -807,7 +807,7 @@ function openCompanyDialog() {
   const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
   if (!domain) { showStatus('Keine Firmen-Domain erkannt.', 'error'); return; }
   const params = new URLSearchParams({ domain, t: _token || '', _v: '20260629q' });
-  const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/company.html?${params.toString()}`;
+  const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/company.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {
@@ -819,7 +819,7 @@ function openCompanyDialog() {
 
 function openBatchDialog() {
   const params = new URLSearchParams({ t: _token || '', _v: '20260629q' });
-  const url    = `https://gkaufmannzh.github.io/tembu.app/outlook-addin/batch.html?${params.toString()}`;
+  const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/batch.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {

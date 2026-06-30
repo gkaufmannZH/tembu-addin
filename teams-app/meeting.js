@@ -1,7 +1,7 @@
 /* globals msal, microsoftTeams */
 
 const CLIENT_ID   = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
-const AUTH_URL    = 'https://gkaufmannzh.github.io/tembu.app/teams-app/auth.html';
+const AUTH_URL    = 'https://gkaufmannzh.github.io/tembu-addin/teams-app/auth.html';
 const SCOPES      = ['User.Read', 'Tasks.ReadWrite', 'Chat.ReadBasic'];
 const TEMBU_LIST  = TCore.TEMBU_LIST;
 

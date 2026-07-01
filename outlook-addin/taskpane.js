@@ -105,7 +105,7 @@ function resetItemContext() {
   } catch {}
 
   clearStatus();
-  updateBrowseTabLabel();
+  updateRelationsTabLabel();
 }
 
 // ── Debug: context indicator in header ────────────────────────────────────
@@ -165,11 +165,11 @@ function loadOutlookContext() {
           if (r.status === Office.AsyncResultStatus.Succeeded) {
             (r.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
           }
-          updateBrowseTabLabel();
+          updateRelationsTabLabel();
           renderContactPicker('');
         });
       }
-      updateBrowseTabLabel();
+      updateRelationsTabLabel();
       renderContactPicker('');
     } else if (item.from?.getAsync) {
       item.from.getAsync(r => {
@@ -181,11 +181,11 @@ function loadOutlookContext() {
             if (toR.status === Office.AsyncResultStatus.Succeeded) {
               (toR.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
             }
-            updateBrowseTabLabel();
+            updateRelationsTabLabel();
             renderContactPicker('');
           });
         } else {
-          updateBrowseTabLabel();
+          updateRelationsTabLabel();
           renderContactPicker('');
         }
       });
@@ -212,7 +212,7 @@ function loadOutlookContext() {
       const all = [...(item.requiredAttendees || []), ...(item.optionalAttendees || [])];
       all.forEach(a => addApptContact(a.displayName, a.emailAddress));
       _appointmentAttendeeNames = all.map(a => a.displayName).filter(Boolean);
-      updateBrowseTabLabel();
+      updateRelationsTabLabel();
       renderContactPicker('');
       if (_token) loadMeetingBriefing();
     } else if (item.requiredAttendees?.getAsync) {
@@ -220,7 +220,7 @@ function loadOutlookContext() {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
           (r.value || []).forEach(a => addApptContact(a.displayName, a.emailAddress));
           _appointmentAttendeeNames = (r.value || []).map(a => a.displayName).filter(Boolean);
-          updateBrowseTabLabel();
+          updateRelationsTabLabel();
           renderContactPicker('');
           if (_token) loadMeetingBriefing();
         }
@@ -609,12 +609,11 @@ async function handleSave() {
 
 // ── Rumble Browse (Tab: Alle Rumbles / Teilnehmer) ────────────────────────
 function showTab(tab) {
-  const isCreate = tab === 'create';
-  document.getElementById('createPane').classList.toggle('hidden', !isCreate);
-  document.getElementById('browsePane').classList.toggle('hidden', isCreate);
-  document.getElementById('tabCreate').classList.toggle('active', isCreate);
-  document.getElementById('tabBrowse').classList.toggle('active', !isCreate);
-  if (!isCreate) {
+  ['contact', 'company', 'relations', 'settings'].forEach(t => {
+    document.getElementById(t + 'Pane')?.classList.toggle('hidden', t !== tab);
+    document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
+  });
+  if (tab === 'relations') {
     const participants = _contextParticipants();
     const searchEl = document.getElementById('rumbleSearch');
     if (searchEl) {
@@ -627,12 +626,12 @@ function showTab(tab) {
   }
 }
 
-function updateBrowseTabLabel() {
+function updateRelationsTabLabel() {
   const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
-  const tabBrowse = document.getElementById('tabBrowse');
-  if (!tabBrowse) return;
-  if (isAppt && _appointmentAttendeeNames.length) tabBrowse.textContent = 'Teilnehmer';
-  else tabBrowse.textContent = 'Alle Rumbles';
+  const tabRelations = document.getElementById('tabRelations');
+  if (!tabRelations) return;
+  if (isAppt && _appointmentAttendeeNames.length) tabRelations.textContent = 'Teilnehmer';
+  else tabRelations.textContent = 'Relations';
 }
 
 // ── Participant picker ────────────────────────────────────────────────────

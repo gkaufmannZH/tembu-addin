@@ -236,12 +236,14 @@
 
       <!-- Tab bar -->
       <div class="tab-bar" style="margin-top:10px">
-        <button class="tab-btn active" id="tabCreate" onclick="showTab('create')">Erstellen</button>
-        <button class="tab-btn" id="tabBrowse" onclick="showTab('browse')">Alle Rumbles</button>
+        <button class="tab-btn active" id="tabContact" onclick="showTab('contact')">Contact</button>
+        <button class="tab-btn" id="tabCompany" onclick="showTab('company')">Company</button>
+        <button class="tab-btn" id="tabRelations" onclick="showTab('relations')">Relations</button>
+        <button class="tab-btn" id="tabSettings" onclick="showTab('settings')">Settings</button>
       </div>
 
-      <!-- Tab: Erstellen -->
-      <div id="createPane">
+      <!-- Tab: Contact -->
+      <div id="contactPane">
 
       <!-- Contact picker: shown when Ribbon-Button clicked (no email/meeting context) -->
       <div id="contactPickerSection" class="hidden">
@@ -297,12 +299,22 @@
 
       <button class="btn-save" id="btnSave" style="margin-top:8px">Rumble speichern</button>
 
-      </div><!-- end #createPane -->
+      </div><!-- end #contactPane -->
 
-      <!-- Tab: Alle Rumbles -->
-      <div id="browsePane" class="hidden">
+      <!-- Tab: Company -->
+      <div id="companyPane" class="hidden">
+        <div class="rumble-empty" style="padding-top:40px">Company-Analyse — coming soon.</div>
+      </div>
+
+      <!-- Tab: Relations -->
+      <div id="relationsPane" class="hidden">
         <input class="rumble-search" id="rumbleSearch" type="text" placeholder="Kontakt suchen…" oninput="filterRumbles(this.value)" />
         <div id="rumbleBrowsePanel"><div class="rumble-empty">Lade…</div></div>
+      </div>
+
+      <!-- Tab: Settings -->
+      <div id="settingsPane" class="hidden">
+        <div class="rumble-empty" style="padding-top:40px">Einstellungen — coming soon.</div>
       </div>
     </div>
 

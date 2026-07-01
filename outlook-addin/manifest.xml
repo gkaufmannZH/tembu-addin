@@ -5,19 +5,20 @@
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
   xsi:type="MailApp">
 
-  <Id>c1e2255f-88fb-42ec-beca-1dff076d0a34</Id>
-  <Version>1.0.3.7</Version>
+  <Id>f4f28c08-de59-4eef-b70f-63e91fd283e0</Id>
+  <Version>2.4.0.0</Version>
   <ProviderName>Tembu</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Tembu Rumbles" />
-  <Description DefaultValue="Create a Rumble from Outlook" />
-  <IconUrl DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-  <HighResolutionIconUrl DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+  <DisplayName DefaultValue="Tembu Rumbles (local)" />
+  <Description DefaultValue="Create a Rumble from Outlook – v20260701a (local)" />
+  <IconUrl DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
   <SupportUrl DefaultValue="https://tembu.app" />
 
   <AppDomains>
-    <AppDomain>https://gkaufmannzh.github.io</AppDomain>
+    <AppDomain>https://localhost:5001</AppDomain>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
+    <AppDomain>https://gkaufmannzh.github.io</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -33,7 +34,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/taskpane.html?v=20260624" />
+        <SourceLocation DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701a" />
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -48,7 +49,7 @@
     <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Edit" />
   </Rule>
 
-  <!-- V1_0: Ältere Outlook-Versionen (ohne Pinning) -->
+  <!-- V1_0: Ältere Outlook-Versionen -->
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Requirements>
       <bt:Sets DefaultMinVersion="1.3">
@@ -66,16 +67,10 @@
                 <Label resid="GroupLabel" />
                 <Control xsi:type="Button" id="msgReadButton">
                   <Label resid="ButtonLabel" />
-                  <Supertip>
-                    <Title resid="ButtonLabel" />
-                    <Description resid="ButtonTooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.16" />
-                    <bt:Image size="32" resid="Icon.32" />
-                    <bt:Image size="80" resid="Icon.80" />
-                  </Icon>
+                  <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                   <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>TembuTaskpane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Url" />
                   </Action>
                 </Control>
@@ -89,16 +84,10 @@
                 <Label resid="GroupLabel" />
                 <Control xsi:type="Button" id="apptOrgButton">
                   <Label resid="ButtonLabel" />
-                  <Supertip>
-                    <Title resid="ButtonLabel" />
-                    <Description resid="ButtonTooltip" />
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.16" />
-                    <bt:Image size="32" resid="Icon.32" />
-                    <bt:Image size="80" resid="Icon.80" />
-                  </Icon>
+                  <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                   <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>TembuTaskpane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Appt.Url" />
                   </Action>
                 </Control>
@@ -111,25 +100,25 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.16" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/taskpane.html?v=20260624?mode=picker" />
-        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/taskpane.html?v=20260624" />
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701a" />
+        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701a" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Tembu" />
-        <bt:String id="ButtonLabel" DefaultValue="Create Rumble" />
+        <bt:String id="ButtonLabel" DefaultValue="Tembu" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="ButtonTooltip" DefaultValue="Create a Tembu Rumble from this email or appointment" />
+        <bt:String id="ButtonTooltip" DefaultValue="Open Tembu" />
       </bt:LongStrings>
     </Resources>
 
-    <!-- V1_1 (verschachtelt): Modernes Outlook mit SupportsPinning -->
+    <!-- V1_1: Modernes Outlook mit SupportsPinning -->
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
       <Requirements>
         <bt:Sets DefaultMinVersion="1.5">
@@ -147,16 +136,10 @@
                   <Label resid="GroupLabel" />
                   <Control xsi:type="Button" id="msgReadButtonV11">
                     <Label resid="ButtonLabel" />
-                    <Supertip>
-                      <Title resid="ButtonLabel" />
-                      <Description resid="ButtonTooltip" />
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16" />
-                      <bt:Image size="32" resid="Icon.32" />
-                      <bt:Image size="80" resid="Icon.80" />
-                    </Icon>
+                    <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                    <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
+                      <TaskpaneId>TembuTaskpane</TaskpaneId>
                       <SourceLocation resid="Taskpane.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
@@ -171,16 +154,10 @@
                   <Label resid="GroupLabel" />
                   <Control xsi:type="Button" id="apptOrgButtonV11">
                     <Label resid="ButtonLabel" />
-                    <Supertip>
-                      <Title resid="ButtonLabel" />
-                      <Description resid="ButtonTooltip" />
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16" />
-                      <bt:Image size="32" resid="Icon.32" />
-                      <bt:Image size="80" resid="Icon.80" />
-                    </Icon>
+                    <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                    <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
+                      <TaskpaneId>TembuTaskpane</TaskpaneId>
                       <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
@@ -195,16 +172,10 @@
                   <Label resid="GroupLabel" />
                   <Control xsi:type="Button" id="apptAttButtonV11">
                     <Label resid="ButtonLabel" />
-                    <Supertip>
-                      <Title resid="ButtonLabel" />
-                      <Description resid="ButtonTooltip" />
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16" />
-                      <bt:Image size="32" resid="Icon.32" />
-                      <bt:Image size="80" resid="Icon.80" />
-                    </Icon>
+                    <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                    <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
+                      <TaskpaneId>TembuTaskpane</TaskpaneId>
                       <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
@@ -218,21 +189,21 @@
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon.16" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-          <bt:Image id="Icon.32" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-          <bt:Image id="Icon.80" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.16" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.32" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.80" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="Commands.Url" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/commands.html" />
-          <bt:Url id="Taskpane.Url" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/taskpane.html?v=20260624?mode=picker" />
-          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/taskpane.html?v=20260624" />
+          <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
+          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701a" />
+          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701a" />
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Tembu" />
-          <bt:String id="ButtonLabel" DefaultValue="Create Rumble" />
+          <bt:String id="ButtonLabel" DefaultValue="Tembu" />
         </bt:ShortStrings>
         <bt:LongStrings>
-          <bt:String id="ButtonTooltip" DefaultValue="Create a Tembu Rumble from this email or appointment" />
+          <bt:String id="ButtonTooltip" DefaultValue="Open Tembu" />
         </bt:LongStrings>
       </Resources>
     </VersionOverrides>

@@ -89,12 +89,11 @@ function resetItemContext() {
   });
   document.getElementById('btnOpenDetail')?.classList.add('hidden');
   document.getElementById('btnOpenCompany')?.classList.add('hidden');
-  ['participantPicker', 'briefingSection', 'sourceBadge', 'contactPickerSection'].forEach(id => {
+  ['participantPicker', 'briefingSection', 'sourceBadge', 'mailContactsSection'].forEach(id => {
     document.getElementById(id)?.classList.add('hidden');
   });
   _contextContacts = [];
-  const searchEl = document.getElementById('contactPickerSearch');
-  if (searchEl) searchEl.value = '';
+  document.getElementById('contactDropdown')?.classList.add('hidden');
   const followUpCheck = document.getElementById('followUpCheck');
   if (followUpCheck) followUpCheck.checked = false;
   document.getElementById('followUpOptions')?.classList.add('hidden');
@@ -145,9 +144,9 @@ function loadOutlookContext() {
   }
 
   if (item.itemType === Office.MailboxEnums.ItemType.Message) {
-    typeEl.textContent = 'E-Mail';
+    if (typeEl) typeEl.textContent = 'E-Mail';
     badge?.classList.remove('hidden');
-    setSubject(subjectEl);
+    if (subjectEl) setSubject(subjectEl);
     _messageParticipantNames = [];
 
     const addMailContact = (name, email) => {
@@ -166,11 +165,11 @@ function loadOutlookContext() {
             (r.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
           }
           updateRelationsTabLabel();
-          renderContactPicker('');
+          refreshContactUI();
         });
       }
       updateRelationsTabLabel();
-      renderContactPicker('');
+      refreshContactUI();
     } else if (item.from?.getAsync) {
       item.from.getAsync(r => {
         if (r.status === Office.AsyncResultStatus.Succeeded) {
@@ -182,11 +181,11 @@ function loadOutlookContext() {
               (toR.value || []).forEach(a => addMailContact(a.displayName, a.emailAddress));
             }
             updateRelationsTabLabel();
-            renderContactPicker('');
+            refreshContactUI();
           });
         } else {
           updateRelationsTabLabel();
-          renderContactPicker('');
+          refreshContactUI();
         }
       });
     }
@@ -197,9 +196,9 @@ function loadOutlookContext() {
     } catch {}
 
   } else if (item.itemType === Office.MailboxEnums.ItemType.Appointment) {
-    typeEl.textContent = 'Termin';
+    if (typeEl) typeEl.textContent = 'Termin';
     badge?.classList.remove('hidden');
-    setSubject(subjectEl);
+    if (subjectEl) setSubject(subjectEl);
     _appointmentAttendeeNames = [];
 
     const addApptContact = (name, email) => {
@@ -213,7 +212,7 @@ function loadOutlookContext() {
       all.forEach(a => addApptContact(a.displayName, a.emailAddress));
       _appointmentAttendeeNames = all.map(a => a.displayName).filter(Boolean);
       updateRelationsTabLabel();
-      renderContactPicker('');
+      refreshContactUI();
       if (_token) loadMeetingBriefing();
     } else if (item.requiredAttendees?.getAsync) {
       item.requiredAttendees.getAsync(r => {
@@ -221,7 +220,7 @@ function loadOutlookContext() {
           (r.value || []).forEach(a => addApptContact(a.displayName, a.emailAddress));
           _appointmentAttendeeNames = (r.value || []).map(a => a.displayName).filter(Boolean);
           updateRelationsTabLabel();
-          renderContactPicker('');
+          refreshContactUI();
           if (_token) loadMeetingBriefing();
         }
       });
@@ -260,7 +259,7 @@ async function loadContactsFromGraph() {
         if (match?.phone) c.phone = match.phone;
       }
     });
-    renderContactPicker('');
+    refreshContactUI();
     triggerPhoneLookup(); // Nachträglich ausfüllen falls Name schon gesetzt war
   } catch {}
 }
@@ -295,78 +294,92 @@ function triggerPhoneLookup() {
   if (match?.phone) phoneInput.value = match.phone;
 }
 
-// ── Contact picker (Ribbon-Button mode: no email/meeting context) ─────────
+// ── Contact UI: Mail-Kontakte + durchsuchbares Dropdown ──────────────────
 function showContactPickerSection() {
-  const section = document.getElementById('contactPickerSection');
-  if (!section) return;
-  section.classList.remove('hidden');
-  renderContactPicker('');
+  refreshContactUI();
 }
 
-function renderContactPicker(filter) {
-  const list = document.getElementById('contactPickerList');
+function refreshContactUI() {
+  renderMailContacts();
+  const mailSection = document.getElementById('mailContactsSection');
+  if (mailSection) mailSection.classList.toggle('hidden', _contextContacts.length === 0);
+}
+
+function renderMailContacts() {
+  const list = document.getElementById('mailContactsList');
   if (!list) return;
-
-  const q = filter.toLowerCase().trim();
-  const hasContext = !q && _contextContacts.length > 0;
-  let html = '';
-
-  if (hasContext) {
-    html += _contextContacts.map(c =>
-      `<div class="contact-picker-row context-contact"
-        data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}"
-        data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}"
-        data-email="${escapeTp(c.email || '').replace(/"/g, '&quot;')}">
-        <span class="contact-picker-name">${escapeTp(c.name)}</span>
-        <span class="contact-context-badge">${escapeTp(c.label)}</span>
-      </div>`
-    ).join('');
-    html += '<div class="contact-picker-divider"></div>';
-  }
-
-  if (!_contactDirectory.length) {
-    if (!hasContext) html += '<div class="rumble-empty">Kontakte werden geladen…</div>';
-  } else {
-    const matches = q
-      ? _contactDirectory.filter(c => c.name.toLowerCase().includes(q))
-      : _contactDirectory;
-    if (!matches.length && !hasContext) {
-      list.innerHTML = '<div class="rumble-empty">Keine Treffer.</div>';
-      return;
-    }
-    html += matches.map(c =>
-      `<div class="contact-picker-row"
-        data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}"
-        data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}">
-        <span class="contact-picker-name">${escapeTp(c.name)}</span>
-        ${c.phone ? `<span class="contact-picker-phone">${escapeTp(c.phone)}</span>` : ''}
-      </div>`
-    ).join('');
-  }
-
-  list.innerHTML = html;
-  list.querySelectorAll('.contact-picker-row').forEach(row => {
+  const currentName = document.getElementById('contactName')?.value || '';
+  list.innerHTML = _contextContacts.map(c =>
+    `<div class="mail-contact-row${c.name === currentName ? ' selected' : ''}"
+      data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}"
+      data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}"
+      data-email="${escapeTp(c.email || '').replace(/"/g, '&quot;')}">
+      <span class="mail-contact-name">${escapeTp(c.name)}</span>
+      <span class="mail-contact-badge">${escapeTp(c.label)}</span>
+    </div>`
+  ).join('');
+  list.querySelectorAll('.mail-contact-row').forEach(row => {
     row.addEventListener('click', () =>
       selectContactFromPicker(row.dataset.name, row.dataset.phone, row.dataset.email)
     );
   });
 }
 
-function filterContactPicker(val) {
-  renderContactPicker(val);
+function renderContactDropdown(filter) {
+  const dropdown = document.getElementById('contactDropdown');
+  if (!dropdown) return;
+  const q = (filter || '').toLowerCase().trim();
+  if (!_contactDirectory.length) {
+    dropdown.innerHTML = '<div class="rumble-empty" style="padding:10px">Kontakte werden geladen…</div>';
+    return;
+  }
+  const matches = q
+    ? _contactDirectory.filter(c => c.name.toLowerCase().includes(q))
+    : _contactDirectory;
+  if (!matches.length) {
+    dropdown.innerHTML = '<div class="rumble-empty" style="padding:10px">Keine Treffer.</div>';
+    return;
+  }
+  dropdown.innerHTML = matches.map(c =>
+    `<div class="contact-picker-row"
+      data-name="${escapeTp(c.name).replace(/"/g, '&quot;')}"
+      data-phone="${escapeTp(c.phone || '').replace(/"/g, '&quot;')}">
+      <span class="contact-picker-name">${escapeTp(c.name)}</span>
+      ${c.phone ? `<span class="contact-picker-phone">${escapeTp(c.phone)}</span>` : ''}
+    </div>`
+  ).join('');
+  dropdown.querySelectorAll('.contact-picker-row').forEach(row => {
+    row.addEventListener('click', () =>
+      selectContactFromPicker(row.dataset.name, row.dataset.phone, row.dataset.email)
+    );
+  });
+}
+
+function openContactDropdown() {
+  renderContactDropdown('');
+  document.getElementById('contactDropdown')?.classList.remove('hidden');
+}
+
+function closeContactDropdownDelayed() {
+  setTimeout(() => document.getElementById('contactDropdown')?.classList.add('hidden'), 200);
+}
+
+function filterContactDropdown(val) {
+  renderContactDropdown(val);
+  document.getElementById('contactDropdown')?.classList.remove('hidden');
 }
 
 function selectContactFromPicker(name, phone, email) {
-  document.getElementById('contactName').value = name;
+  const nameInput = document.getElementById('contactName');
+  if (nameInput) nameInput.value = name;
   const phoneInput = document.getElementById('contactPhone');
   const resolved = phone || _contactDirectory.find(c => nameMatch(c.name, name))?.phone || '';
   if (phoneInput) phoneInput.value = resolved;
   _contactEmail = email || null;
-  document.getElementById('contactPickerSection')?.classList.add('hidden');
-  const searchEl = document.getElementById('contactPickerSearch');
-  if (searchEl) searchEl.value = '';
+  document.getElementById('contactDropdown')?.classList.add('hidden');
   document.getElementById('btnOpenDetail')?.classList.remove('hidden');
   updateCompanyButton();
+  renderMailContacts();
   document.getElementById('rumbleText')?.focus();
 }
 
@@ -609,7 +622,7 @@ async function handleSave() {
 
 // ── Rumble Browse (Tab: Alle Rumbles / Teilnehmer) ────────────────────────
 function showTab(tab) {
-  ['contact', 'company', 'relations', 'settings'].forEach(t => {
+  ['rumble', 'contact', 'company', 'relations', 'settings'].forEach(t => {
     document.getElementById(t + 'Pane')?.classList.toggle('hidden', t !== tab);
     document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
   });
@@ -630,8 +643,9 @@ function updateRelationsTabLabel() {
   const isAppt = _itemType === Office.MailboxEnums.ItemType.Appointment;
   const tabRelations = document.getElementById('tabRelations');
   if (!tabRelations) return;
-  if (isAppt && _appointmentAttendeeNames.length) tabRelations.textContent = 'Teilnehmer';
-  else tabRelations.textContent = 'Relations';
+  const labelSpan = tabRelations.querySelector('span:last-child') || tabRelations;
+  if (isAppt && _appointmentAttendeeNames.length) labelSpan.textContent = 'Teilnehmer';
+  else labelSpan.textContent = 'Relations';
 }
 
 // ── Participant picker ────────────────────────────────────────────────────

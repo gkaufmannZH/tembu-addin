@@ -8,25 +8,79 @@
   <script src="lib/msal-browser.min.js?v=20260608"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
+    html, body {
+      height: 100%;
+      overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #fff;
       color: #1a1a1a;
       font-size: 14px;
+      display: flex;
+      flex-direction: column;
     }
     .header {
       background: #2d5a5a;
       color: #fff;
-      padding: 14px 16px 12px;
+      padding: 12px 16px 10px;
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-shrink: 0;
     }
     .header-title { font-size: 16px; font-weight: 700; }
     .header-sub { font-size: 11px; opacity: 0.75; margin-top: 1px; }
 
+    /* Sign-in state: full width */
     .pane { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 
+    /* Signed-in state: sidebar layout */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left sidebar */
+    .sidebar {
+      width: 68px;
+      background: #1a3838;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      padding-top: 4px;
+    }
+    .sidebar-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 11px 4px;
+      cursor: pointer;
+      color: rgba(255,255,255,0.5);
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      text-align: center;
+      gap: 4px;
+      border-left: 3px solid transparent;
+      transition: color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .sidebar-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.07); }
+    .sidebar-item.active { color: #fff; border-left-color: #7dd4d4; background: rgba(255,255,255,0.11); }
+    .sidebar-icon { font-size: 19px; line-height: 1; }
+
+    /* Right content area */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Fields */
     .field label {
       display: block;
       font-size: 11px;
@@ -102,18 +156,6 @@
       font-size: 12px; cursor: pointer; text-decoration: underline;
     }
 
-    /* Tab bar */
-    .tab-bar {
-      display: flex; gap: 0; border-bottom: 2px solid #eee; margin-bottom: 14px;
-    }
-    .tab-btn {
-      flex: 1; background: none; border: none; border-bottom: 2px solid transparent;
-      padding: 9px 6px; font-size: 13px; font-weight: 600; color: #888;
-      cursor: pointer; margin-bottom: -2px; transition: color 0.15s;
-    }
-    .tab-btn.active { color: #2d5a5a; border-bottom-color: #2d5a5a; }
-    .tab-btn:hover { color: #2d5a5a; }
-
     /* Rumble browse */
     .rumble-search {
       width: 100%; border: 1.5px solid #ddd; border-radius: 8px;
@@ -174,6 +216,35 @@
     .followup-date:focus { border-color: #2d5a5a; }
     .followup-options { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
 
+    /* Mail contacts section */
+    .mail-contacts-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #2d5a5a; margin-bottom: 5px;
+    }
+    .mail-contact-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 11px; background: #f5fafa; border: 1px solid #e0eaea;
+      border-radius: 8px; margin-bottom: 4px; cursor: pointer; gap: 8px;
+      transition: background 0.12s;
+    }
+    .mail-contact-row:hover { background: #e0eeee; }
+    .mail-contact-row.selected { background: #2d5a5a; }
+    .mail-contact-name { font-size: 13px; font-weight: 500; flex: 1; color: #1a1a1a; }
+    .mail-contact-row.selected .mail-contact-name { color: #fff; }
+    .mail-contact-badge {
+      font-size: 10px; font-weight: 700; color: #2d5a5a;
+      background: #c8dada; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;
+    }
+    .mail-contact-row.selected .mail-contact-badge { color: #fff; background: rgba(255,255,255,0.25); }
+
+    /* Contact dropdown */
+    .contact-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1.5px solid #2d5a5a; border-top: none;
+      border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto;
+      z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
     /* Contact picker */
     .contact-picker-row {
       padding: 8px 11px; cursor: pointer; border-bottom: 1px solid #f0f0f0;
@@ -208,98 +279,118 @@
 <body>
   <div class="header">
     <div>
-      <div class="header-title">Tembu <span style="font-size:10px;opacity:0.6;font-weight:400">v50 · M1.0.3.7 · js:20260701a</span></div>
+      <div class="header-title">Tembu <span id="buildLabel" style="font-size:10px;opacity:0.6;font-weight:400"></span></div>
       <div class="header-sub">Rumble erstellen</div>
     </div>
   </div>
 
-  <div class="pane">
-    <!-- Source context badge -->
-    <div class="source-badge hidden" id="sourceBadge">
-      <span class="source-type" id="sourceType"></span>
-      <span class="source-subject" id="sourceSubject"></span>
-    </div>
+  <!-- Not signed in: full width -->
+  <div id="signInSection" class="pane">
+    <div class="status info">Microsoft-Konto verbinden um Rumbles zu speichern.</div>
+    <button class="btn-save" id="btnSignIn">Mit Microsoft anmelden</button>
+  </div>
 
-    <!-- Not signed in -->
-    <div id="signInSection">
-      <div class="status info">Microsoft-Konto verbinden um Rumbles zu speichern.</div>
-      <br/>
-      <button class="btn-save" id="btnSignIn">Mit Microsoft anmelden</button>
-    </div>
+  <!-- Signed in: sidebar layout -->
+  <div id="formSection" class="app-body hidden">
 
-    <!-- Signed in: form -->
-    <div id="formSection" class="hidden">
+    <!-- Left sidebar navigation -->
+    <nav class="sidebar">
+      <div class="sidebar-item active" id="tabRumble" onclick="showTab('rumble')">
+        <span class="sidebar-icon">📝</span>
+        <span>Rumble</span>
+      </div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:4px 8px" />
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.35);text-align:center;padding:6px 4px 2px">Analysis</div>
+      <div class="sidebar-item" id="tabContact" onclick="showTab('contact')">
+        <span class="sidebar-icon">👤</span>
+        <span>Contact</span>
+      </div>
+      <div class="sidebar-item" id="tabCompany" onclick="showTab('company')">
+        <span class="sidebar-icon">🏢</span>
+        <span>Company</span>
+      </div>
+      <div class="sidebar-item" id="tabRelations" onclick="showTab('relations')">
+        <span class="sidebar-icon">🔗</span>
+        <span>Relations</span>
+      </div>
+      <div class="sidebar-item" id="tabSettings" onclick="showTab('settings')">
+        <span class="sidebar-icon">⚙️</span>
+        <span>Settings</span>
+      </div>
+    </nav>
+
+    <!-- Right content area -->
+    <div class="content-area">
+
+      <!-- User row -->
       <div class="user-row">
         <span id="userLabel"></span>
         <button class="btn-signout" id="btnSignOut">Abmelden</button>
       </div>
 
-      <!-- Tab bar -->
-      <div class="tab-bar" style="margin-top:10px">
-        <button class="tab-btn active" id="tabContact" onclick="showTab('contact')">Contact</button>
-        <button class="tab-btn" id="tabCompany" onclick="showTab('company')">Company</button>
-        <button class="tab-btn" id="tabRelations" onclick="showTab('relations')">Relations</button>
-        <button class="tab-btn" id="tabSettings" onclick="showTab('settings')">Settings</button>
-      </div>
+      <!-- Tab: Rumble -->
+      <div id="rumblePane">
+
+        <!-- Contacts from current mail/appointment -->
+        <div id="mailContactsSection" class="hidden">
+          <div class="mail-contacts-label">Aus dieser E-Mail</div>
+          <div id="mailContactsList"></div>
+        </div>
+
+        <!-- Meeting briefing: shown for appointments with existing Rumbles -->
+        <div id="briefingSection" class="hidden">
+          <div class="briefing-label">Rumbles für dieses Meeting</div>
+          <div id="briefingList"></div>
+        </div>
+
+        <!-- Searchable contact dropdown -->
+        <div class="field" style="margin-top:4px">
+          <label>Kontakt</label>
+          <div style="position:relative">
+            <input type="text" id="contactName" placeholder="Kontakt suchen…" autocomplete="off"
+                   oninput="filterContactDropdown(this.value)"
+                   onfocus="openContactDropdown()"
+                   onblur="closeContactDropdownDelayed()" />
+            <div id="contactDropdown" class="contact-dropdown hidden" onmousedown="event.preventDefault()"></div>
+          </div>
+        </div>
+
+        <!-- Participant picker: shown when mail/appt has multiple people -->
+        <div id="participantPicker" class="hidden" style="margin:-6px 0 6px">
+          <div class="participant-picker-label">Für wen ist der Rumble?</div>
+          <div id="participantChips"></div>
+        </div>
+
+        <div class="field">
+          <label>Telefonnummer <span style="font-weight:400;opacity:0.6">(für Näherungserkennung)</span></label>
+          <input type="tel" id="contactPhone" placeholder="+41 79 123 45 67" />
+        </div>
+
+        <div class="field">
+          <label>Rumble</label>
+          <textarea id="rumbleText" placeholder="Was möchtest du beim nächsten Treffen besprechen?"></textarea>
+        </div>
+
+        <!-- Follow-up Outlook Task -->
+        <div id="followUpSection" style="margin-top:8px">
+          <label class="followup-check-label">
+            <input type="checkbox" id="followUpCheck" onchange="toggleFollowUpOptions()" />
+            Als Outlook-Aufgabe speichern
+          </label>
+          <div id="followUpOptions" class="hidden followup-options">
+            <textarea class="followup-input" id="followUpNote" placeholder="Aufgabe oder Notiz zum Gespräch…"></textarea>
+            <input type="datetime-local" id="followUpDate" class="followup-date" />
+          </div>
+        </div>
+
+        <button class="btn-save" id="btnSave" style="margin-top:8px">Rumble speichern</button>
+
+      </div><!-- end #rumblePane -->
 
       <!-- Tab: Contact -->
-      <div id="contactPane">
-
-      <!-- Contact picker: shown when Ribbon-Button clicked (no email/meeting context) -->
-      <div id="contactPickerSection" class="hidden">
-        <input class="rumble-search" type="text" id="contactPickerSearch" placeholder="Kontakt suchen…" oninput="filterContactPicker(this.value)" style="margin-bottom:6px" />
-        <div id="contactPickerList" style="max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:8px"></div>
+      <div id="contactPane" class="hidden">
+        <div class="rumble-empty" style="padding-top:40px">Contact — coming soon.</div>
       </div>
-
-      <!-- Meeting briefing (Point 6): shown for appointments with existing Rumbles -->
-      <div id="briefingSection" class="hidden">
-        <div class="briefing-label">Rumbles für dieses Meeting</div>
-        <div id="briefingList"></div>
-      </div>
-
-      <div class="field" style="margin-top:4px">
-        <label>Kontakt</label>
-        <input type="text" id="contactName" placeholder="Name des Kontakts" autocomplete="off" />
-        <div style="display:flex;gap:6px;margin-top:5px">
-          <button id="btnOpenDetail"  class="hidden" onclick="openDetailDialog()"  style="flex:1;background:none;border:1.5px solid #2d5a5a;border-radius:8px;padding:7px;font-size:12px;color:#2d5a5a;font-weight:600;cursor:pointer;">🔍 Kontakt</button>
-          <button id="btnOpenCompany" class="hidden" onclick="openCompanyDialog()" style="flex:1;background:none;border:1.5px solid #7a5c00;border-radius:8px;padding:7px;font-size:12px;color:#7a5c00;font-weight:600;cursor:pointer;">🏢 Firma</button>
-        </div>
-        <div style="margin-top:6px">
-          <button onclick="openBatchDialog()" style="width:100%;background:none;border:1.5px solid #555;border-radius:8px;padding:7px;font-size:12px;color:#555;font-weight:600;cursor:pointer;">📥 Alle analysieren</button>
-        </div>
-      </div>
-
-      <!-- Participant picker: shown when mail/appt has multiple people -->
-      <div id="participantPicker" class="hidden" style="margin:-6px 0 6px">
-        <div class="participant-picker-label">Für wen ist der Rumble?</div>
-        <div id="participantChips"></div>
-      </div>
-
-      <div class="field">
-        <label>Telefonnummer <span style="font-weight:400;opacity:0.6">(für Näherungserkennung)</span></label>
-        <input type="tel" id="contactPhone" placeholder="+41 79 123 45 67" />
-      </div>
-
-      <div class="field">
-        <label>Rumble</label>
-        <textarea id="rumbleText" placeholder="Was möchtest du beim nächsten Treffen besprechen?"></textarea>
-      </div>
-
-      <!-- Follow-up Outlook Task: checkbox shown before saving -->
-      <div id="followUpSection" style="margin-top:8px">
-        <label class="followup-check-label">
-          <input type="checkbox" id="followUpCheck" onchange="toggleFollowUpOptions()" />
-          Als Outlook-Aufgabe speichern
-        </label>
-        <div id="followUpOptions" class="hidden followup-options">
-          <textarea class="followup-input" id="followUpNote" placeholder="Aufgabe oder Notiz zum Gespräch…"></textarea>
-          <input type="datetime-local" id="followUpDate" class="followup-date" />
-        </div>
-      </div>
-
-      <button class="btn-save" id="btnSave" style="margin-top:8px">Rumble speichern</button>
-
-      </div><!-- end #contactPane -->
 
       <!-- Tab: Company -->
       <div id="companyPane" class="hidden">
@@ -316,17 +407,20 @@
       <div id="settingsPane" class="hidden">
         <div class="rumble-empty" style="padding-top:40px">Einstellungen — coming soon.</div>
       </div>
-    </div>
 
-    <div class="status hidden" id="statusMsg"></div>
+      <div class="status hidden" id="statusMsg"></div>
 
-    <!-- Diagnose -->
-    <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px">
-      <button id="btnDiag" style="background:none;border:1px solid #ccc;border-radius:6px;padding:5px 10px;font-size:11px;color:#666;cursor:pointer;width:100%">Diagnose</button>
-      <pre id="diagOut" style="font-size:10px;color:#444;background:#f8f8f8;border-radius:6px;padding:8px;margin-top:6px;white-space:pre-wrap;display:none"></pre>
-    </div>
-  </div>
+      <!-- Diagnose -->
+      <div style="margin-top:4px;border-top:1px solid #eee;padding-top:8px">
+        <button id="btnDiag" style="background:none;border:1px solid #ccc;border-radius:6px;padding:5px 10px;font-size:11px;color:#666;cursor:pointer;width:100%">Diagnose</button>
+        <pre id="diagOut" style="font-size:10px;color:#444;background:#f8f8f8;border-radius:6px;padding:8px;margin-top:6px;white-space:pre-wrap;display:none"></pre>
+      </div>
 
+    </div><!-- end .content-area -->
+  </div><!-- end #formSection -->
+
+  <script src="../shared/version.js"></script>
   <script src="taskpane.js?v=20260701a"></script>
+  <script>document.getElementById('buildLabel').textContent = TEMBU_BUILD;</script>
 </body>
 </html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tembu Rumble</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="lib/msal-browser.min.js?v=20260608"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fff;
+      color: #1a1a1a;
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: #2d5a5a;
+      color: #fff;
+      padding: 12px 16px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .header-title { font-size: 16px; font-weight: 700; }
+    .header-sub { font-size: 11px; opacity: 0.75; margin-top: 1px; }
+
+    /* Sign-in state: full width */
+    .pane { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+    /* Signed-in state: sidebar layout */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left sidebar */
+    .sidebar {
+      width: 68px;
+      background: #1a3838;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      padding-top: 4px;
+    }
+    .sidebar-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 11px 4px;
+      cursor: pointer;
+      color: rgba(255,255,255,0.5);
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      text-align: center;
+      gap: 4px;
+      border-left: 3px solid transparent;
+      transition: color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .sidebar-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.07); }
+    .sidebar-item.active { color: #fff; border-left-color: #7dd4d4; background: rgba(255,255,255,0.11); }
+    .sidebar-icon { font-size: 19px; line-height: 1; }
+
+    /* Right content area */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Fields */
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    .field input, .field textarea {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 14px;
+      color: #1a1a1a;
+      background: #fafafa;
+      outline: none;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .field input:focus, .field textarea:focus { border-color: #2d5a5a; background: #fff; }
+    .field textarea { resize: vertical; min-height: 80px; }
+
+    .source-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f0f5f5;
+      border: 1px solid #c8dada;
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 12px;
+      color: #2d5a5a;
+    }
+    .source-badge .source-type { font-weight: 600; }
+    .source-badge .source-subject { opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .btn-save {
+      background: #2d5a5a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.15s;
+    }
+    .btn-save:hover { opacity: 0.88; }
+    .btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .status {
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .status.success { background: #e8f5e8; color: #2d6a2d; }
+    .status.error   { background: #fde8e8; color: #9b2020; }
+    .status.info    { background: #f0f5f5; color: #2d5a5a; }
+
+    .user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #888;
+    }
+    .btn-signout {
+      background: none; border: none; color: #2d5a5a;
+      font-size: 12px; cursor: pointer; text-decoration: underline;
+    }
+
+    /* Rumble browse */
+    .rumble-search {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 8px;
+      padding: 8px 11px; font-size: 13px; outline: none; margin-bottom: 10px;
+    }
+    .rumble-search:focus { border-color: #2d5a5a; }
+    .rumble-group { margin-bottom: 8px; }
+    .rumble-group-name {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4px; color: #2d5a5a; padding: 4px 0 3px;
+      border-bottom: 1px solid #e8f0f0; margin-bottom: 4px;
+    }
+    .rumble-row {
+      font-size: 13px; color: #333; padding: 4px 0; line-height: 1.4;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .rumble-row:last-child { border-bottom: none; }
+    .rumble-empty { font-size: 13px; color: #aaa; text-align: center; padding: 20px 0; }
+    #rumbleBrowsePanel { max-height: 60vh; overflow-y: auto; }
+
+    /* Meeting briefing */
+    .briefing-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #2d5a5a; margin-bottom: 6px;
+    }
+    #briefingSection {
+      background: #f0f5f5; border: 1px solid #c8dada;
+      border-radius: 8px; padding: 10px 11px; margin-top: 4px;
+    }
+    .briefing-item {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 5px 0; border-bottom: 1px solid #dce8e8;
+    }
+    .briefing-item:last-child { border-bottom: none; }
+    .briefing-name { font-size: 12px; font-weight: 600; color: #2d5a5a; }
+    .briefing-text { font-size: 12px; color: #444; }
+
+    /* Follow-up task section */
+    .followup-check-label {
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      font-size: 13px; color: #1a1a1a;
+    }
+    .followup-check-label input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer; accent-color: #2d5a5a; flex-shrink: 0;
+    }
+    .followup-input {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 6px;
+      padding: 7px 9px; font-size: 13px; color: #1a1a1a;
+      background: #fff; outline: none; font-family: inherit;
+      resize: vertical; min-height: 52px; box-sizing: border-box;
+    }
+    .followup-input:focus { border-color: #2d5a5a; }
+    .followup-date {
+      width: 100%; border: 1.5px solid #ddd; border-radius: 6px;
+      padding: 7px 9px; font-size: 13px; color: #1a1a1a;
+      background: #fff; outline: none; font-family: inherit; box-sizing: border-box;
+    }
+    .followup-date:focus { border-color: #2d5a5a; }
+    .followup-options { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+
+    /* Mail contacts section */
+    .mail-contacts-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #2d5a5a; margin-bottom: 5px;
+    }
+    .mail-contact-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 11px; background: #f5fafa; border: 1px solid #e0eaea;
+      border-radius: 8px; margin-bottom: 4px; cursor: pointer; gap: 8px;
+      transition: background 0.12s;
+    }
+    .mail-contact-row:hover { background: #e0eeee; }
+    .mail-contact-row.selected { background: #2d5a5a; }
+    .mail-contact-name { font-size: 13px; font-weight: 500; flex: 1; color: #1a1a1a; }
+    .mail-contact-row.selected .mail-contact-name { color: #fff; }
+    .mail-contact-badge {
+      font-size: 10px; font-weight: 700; color: #2d5a5a;
+      background: #c8dada; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;
+    }
+    .mail-contact-row.selected .mail-contact-badge { color: #fff; background: rgba(255,255,255,0.25); }
+
+    /* Contact dropdown */
+    .contact-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1.5px solid #2d5a5a; border-top: none;
+      border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto;
+      z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* Contact picker */
+    .contact-picker-row {
+      padding: 8px 11px; cursor: pointer; border-bottom: 1px solid #f0f0f0;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .contact-picker-row:hover { background: #f0f5f5; }
+    .contact-picker-row:last-child { border-bottom: none; }
+    .contact-picker-name { font-size: 13px; color: #1a1a1a; font-weight: 500; flex: 1; }
+    .contact-picker-phone { font-size: 11px; color: #888; flex-shrink: 0; }
+    .context-contact { background: #f5fafa; }
+    .context-contact:hover { background: #e8f2f2; }
+    .contact-context-badge {
+      font-size: 10px; font-weight: 700; color: #2d5a5a;
+      background: #c8dada; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;
+    }
+    .contact-picker-divider { height: 1px; background: #e0e0e0; margin: 2px 0; }
+
+    /* Participant picker */
+    .participant-picker-label { font-size: 11px; font-weight: 600; color: #666; margin-bottom: 4px; }
+    .participant-chip {
+      display: inline-block; margin: 2px 4px 2px 0; padding: 5px 12px;
+      border: 1.5px solid #2d5a5a; border-radius: 20px; font-size: 12px;
+      color: #2d5a5a; cursor: pointer; background: none; font-family: inherit;
+    }
+    .participant-chip:hover { background: #f0f5f5; }
+    .participant-chip.active { background: #2d5a5a; color: #fff; }
+    .participant-chip.active:hover { background: #235050; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="header-title">Tembu <span id="buildLabel" style="font-size:10px;opacity:0.6;font-weight:400"></span></div>
+      <div class="header-sub">Rumble erstellen</div>
+    </div>
+  </div>
+
+  <!-- Not signed in: full width -->
+  <div id="signInSection" class="pane">
+    <div class="status info">Microsoft-Konto verbinden um Rumbles zu speichern.</div>
+    <button class="btn-save" id="btnSignIn">Mit Microsoft anmelden</button>
+  </div>
+
+  <!-- Signed in: sidebar layout -->
+  <div id="formSection" class="app-body hidden">
+
+    <!-- Left sidebar navigation -->
+    <nav class="sidebar">
+      <div class="sidebar-item active" id="tabRumble" onclick="showTab('rumble')">
+        <span class="sidebar-icon">📝</span>
+        <span>Rumble</span>
+      </div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:4px 8px" />
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.35);text-align:center;padding:6px 4px 2px">Analysis</div>
+      <div class="sidebar-item" id="tabContact" onclick="showTab('contact')">
+        <span class="sidebar-icon">👤</span>
+        <span>Contact</span>
+      </div>
+      <div class="sidebar-item" id="tabCompany" onclick="showTab('company')">
+        <span class="sidebar-icon">🏢</span>
+        <span>Company</span>
+      </div>
+      <div class="sidebar-item" id="tabRelations" onclick="showTab('relations')">
+        <span class="sidebar-icon">🔗</span>
+        <span>Relations</span>
+      </div>
+      <div class="sidebar-item" id="tabSettings" onclick="showTab('settings')">
+        <span class="sidebar-icon">⚙️</span>
+        <span>Settings</span>
+      </div>
+    </nav>
+
+    <!-- Right content area -->
+    <div class="content-area">
+
+      <!-- User row -->
+      <div class="user-row">
+        <span id="userLabel"></span>
+        <button class="btn-signout" id="btnSignOut">Abmelden</button>
+      </div>
+
+      <!-- Tab: Rumble -->
+      <div id="rumblePane">
+
+        <!-- Contacts from current mail/appointment -->
+        <div id="mailContactsSection" class="hidden">
+          <div class="mail-contacts-label">Aus dieser E-Mail</div>
+          <div id="mailContactsList"></div>
+        </div>
+
+        <!-- Meeting briefing: shown for appointments with existing Rumbles -->
+        <div id="briefingSection" class="hidden">
+          <div class="briefing-label">Rumbles für dieses Meeting</div>
+          <div id="briefingList"></div>
+        </div>
+
+        <!-- Searchable contact dropdown -->
+        <div class="field" style="margin-top:4px">
+          <label>Kontakt</label>
+          <div style="position:relative">
+            <input type="text" id="contactName" placeholder="Kontakt suchen…" autocomplete="off"
+                   oninput="filterContactDropdown(this.value)"
+                   onfocus="openContactDropdown()"
+                   onblur="closeContactDropdownDelayed()" />
+            <div id="contactDropdown" class="contact-dropdown hidden" onmousedown="event.preventDefault()"></div>
+          </div>
+        </div>
+
+        <!-- Participant picker: shown when mail/appt has multiple people -->
+        <div id="participantPicker" class="hidden" style="margin:-6px 0 6px">
+          <div class="participant-picker-label">Für wen ist der Rumble?</div>
+          <div id="participantChips"></div>
+        </div>
+
+        <div class="field">
+          <label>Telefonnummer <span style="font-weight:400;opacity:0.6">(für Näherungserkennung)</span></label>
+          <input type="tel" id="contactPhone" placeholder="+41 79 123 45 67" />
+        </div>
+
+        <div class="field">
+          <label>Rumble</label>
+          <textarea id="rumbleText" placeholder="Was möchtest du beim nächsten Treffen besprechen?"></textarea>
+        </div>
+
+        <!-- Follow-up Outlook Task -->
+        <div id="followUpSection" style="margin-top:8px">
+          <label class="followup-check-label">
+            <input type="checkbox" id="followUpCheck" onchange="toggleFollowUpOptions()" />
+            Als Outlook-Aufgabe speichern
+          </label>
+          <div id="followUpOptions" class="hidden followup-options">
+            <textarea class="followup-input" id="followUpNote" placeholder="Aufgabe oder Notiz zum Gespräch…"></textarea>
+            <input type="datetime-local" id="followUpDate" class="followup-date" />
+          </div>
+        </div>
+
+        <button class="btn-save" id="btnSave" style="margin-top:8px">Rumble speichern</button>
+
+      </div><!-- end #rumblePane -->
+
+      <!-- Tab: Contact -->
+      <div id="contactPane" class="hidden">
+        <div class="rumble-empty" style="padding-top:40px">Contact — coming soon.</div>
+      </div>
+
+      <!-- Tab: Company -->
+      <div id="companyPane" class="hidden">
+        <div class="rumble-empty" style="padding-top:40px">Company-Analyse — coming soon.</div>
+      </div>
+
+      <!-- Tab: Relations -->
+      <div id="relationsPane" class="hidden">
+        <input class="rumble-search" id="rumbleSearch" type="text" placeholder="Kontakt suchen…" oninput="filterRumbles(this.value)" />
+        <div id="rumbleBrowsePanel"><div class="rumble-empty">Lade…</div></div>
+      </div>
+
+      <!-- Tab: Settings -->
+      <div id="settingsPane" class="hidden">
+        <div class="rumble-empty" style="padding-top:40px">Einstellungen — coming soon.</div>
+      </div>
+
+      <div class="status hidden" id="statusMsg"></div>
+
+      <!-- Diagnose -->
+      <div style="margin-top:4px;border-top:1px solid #eee;padding-top:8px">
+        <button id="btnDiag" style="background:none;border:1px solid #ccc;border-radius:6px;padding:5px 10px;font-size:11px;color:#666;cursor:pointer;width:100%">Diagnose</button>
+        <pre id="diagOut" style="font-size:10px;color:#444;background:#f8f8f8;border-radius:6px;padding:8px;margin-top:6px;white-space:pre-wrap;display:none"></pre>
+      </div>
+
+    </div><!-- end .content-area -->
+  </div><!-- end #formSection -->
+
+  <script src="../shared/version.js"></script>
+  <script src="taskpane.js?v=20260701a"></script>
+  <script>document.getElementById('buildLabel').textContent = TEMBU_BUILD;</script>
+</body>
+</html>

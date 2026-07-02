@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="lib/msal-browser.min.js"></script>
+</head>
+<body>
+<script>
+/* globals Office, msal */
+const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
+// Dynamisch statt fest verdrahtet, damit dieselbe Datei sowohl auf localhost:5001 (lokaler
+// Test) als auch auf gkaufmannzh.github.io (Produktiv) korrekt funktioniert. WICHTIG: beide
+// exakten URLs müssen in der Azure-AD-App-Registrierung als SPA-Redirect-URI eingetragen sein.
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read', 'Files.ReadWrite'];
+
+const msalInstance = new msal.PublicClientApplication({
+  auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true },
+});
+
+// Office-Dialoge haben ein Limit von ~5000 Zeichen pro messageParent()-Aufruf.
+// Access-Tokens mit vielen Scopes/Gruppenclaims überschreiten das leicht (lautloser
+// Verlust der Nachricht, kein Fehler) – deshalb bei Bedarf in Chunks senden.
+function sendToParent(payloadObj) {
+  const msg = JSON.stringify(payloadObj);
+  const MAX = 4000;
+  if (msg.length <= MAX) {
+    Office.context.ui.messageParent(msg);
+    return;
+  }
+  const parts = [];
+  for (let i = 0; i < msg.length; i += MAX) parts.push(msg.slice(i, i + MAX));
+  let i = 0;
+  (function next() {
+    Office.context.ui.messageParent(JSON.stringify({ __tembuChunk: true, i, n: parts.length, data: parts[i] }));
+    i++;
+    if (i < parts.length) setTimeout(next, 30);
+  })();
+}
+
+function sendSuccess(result) {
+  sendToParent({
+    success: true,
+    token: result.accessToken,
+    account: { name: result.account.name, username: result.account.username },
+  });
+}
+
+// loginPopup statt loginRedirect: das Office-Dialogfenster navigiert dabei nie weg,
+// sondern öffnet nur ein zusätzliches Popup für login.microsoftonline.com. So bleibt
+// der Office.js-Host-Kontext erhalten.
+Office.initialize = async function () {
+  try {
+    if (msalInstance.initialize) await msalInstance.initialize();
+
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+        sendSuccess(result);
+        return;
+      } catch {}
+    }
+
+    const result = await msalInstance.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
+    sendSuccess(result);
+  } catch (e) {
+    console.error('[tembu-auth]', e);
+    try {
+      sendToParent({ success: false, error: e.message });
+    } catch {}
+  }
+};
+</script>
+</body>
+</html>

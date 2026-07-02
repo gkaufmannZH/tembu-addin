@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Tembu Server</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; background: #f3f4f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .card { background: white; border-radius: 12px; padding: 40px 48px; box-shadow: 0 2px 16px rgba(0,0,0,.08); text-align: center; max-width: 420px; }
+    h1 { color: #1a1a2e; margin: 0 0 8px; font-size: 1.8rem; }
+    .badge { display: inline-block; background: #22c55e; color: white; border-radius: 999px; padding: 4px 16px; font-size: .85rem; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: .9rem; }
+    td { padding: 6px 4px; }
+    td:first-child { color: #6b7280; width: 140px; }
+    td:last-child { font-weight: 600; }
+    .footer { margin-top: 24px; font-size: .8rem; color: #9ca3af; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Tembu Server</h1>
+  <div class="badge" id="statusBadge">wird geladen…</div>
+  <table id="infoTable"></table>
+  <div class="footer">Outlook Add-in läuft auf diesem Gerät</div>
+</div>
+<script>
+  fetch('/api/status')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('statusBadge').textContent = '● Aktiv';
+      const rows = [
+        ['Lizenz',    d.licenseEmail],
+        ['Gültig bis', d.licenseExpiry],
+        ['Tage',      d.daysRemaining],
+        ['Nutzer',    d.authorizedUsers === 0 ? 'alle (Solo)' : d.authorizedUsers],
+        ['Version',   d.version],
+      ];
+      document.getElementById('infoTable').innerHTML =
+        rows.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+    })
+    .catch(() => {
+      document.getElementById('statusBadge').style.background = '#ef4444';
+      document.getElementById('statusBadge').textContent = '● Fehler';
+    });
+</script>
+</body>
+</html>

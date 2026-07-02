@@ -1,0 +1,56 @@
+/* ============================================================
+   tembu-theme.css  —  Warmes Farbsystem (Tembu Mobile)
+   In taskpane.html / detail.html im <head> einbinden:
+     <link rel="stylesheet" href="tembu-theme.css" />
+   Dann die alten Hex-Werte durch var(--…) ersetzen
+   (Mapping siehe Chat / Kommentare unten).
+   ============================================================ */
+
+:root {
+  /* Flächen */
+  --bg:            #FEFAE0;  /* Cornsilk        – Seiten-Hintergrund   (war #fff) */
+  --surface:      #F9EBC7;  /* Lemon Meringue  – Leisten, KPI-Tile     (war #f0f5f5 / #f8f8f8) */
+  --card:         #FFFFFF;  /* Karten (max. Kontrast) */
+  --border:       #E6DFD3;  /* warme Trennlinien       (war #ddd / #eee) */
+
+  /* Text */
+  --text:         #783D19;  /* Russet          – Titel & Primärtext    (war #1a1a1a) */
+  --text-2:       #7A5C40;  /* Body / Fließtext        (war #333 / #444) */
+  --text-muted:   #B99470;  /* Camel           – Labels, Meta, Zeit    (war #666 / #888 / #aaa) */
+
+  /* Marke / Aktionen */
+  --primary:      #5F6F52;  /* Dark Olive      – Buttons, aktiv, Fokus (war #2d5a5a) */
+  --primary-dk:   #556348;  /* Hover           */
+  --secondary:    #A9B388;  /* Laurel          – Meeting, sek. Akzent  */
+  --secondary-dk: #7C8B62;  /* Laurel dunkel   – Icon auf Laurel-Tint  */
+  --accent:       #C4661F;  /* Alloy Orange    – Offene Punkte, Rumble (war #e65100) */
+  --on-primary:   #FEFAE0;  /* Cremetext auf Olive (NICHT #fff) */
+
+  /* Tints (Icon-Pillen / Badges, ~10–20 % Deckung) */
+  --tint-primary:   #5F6F521A;
+  --tint-secondary: #A9B38830;
+  --tint-accent:    #C4661F1A;
+  --tint-openpoint: #F8EBD9;   /* Hintergrund „Offene Punkte“ */
+
+  /* Radius */
+  --r-sm: 7px;   --r-md: 10px;   --r-lg: 12px;   --r-xl: 16px;
+
+  /* Warmer Schatten (Russet statt Schwarz) */
+  --shadow-md: 0 2px 4px rgba(120,61,25,0.05);
+  --shadow-lg: 0 18px 44px rgba(120,61,25,0.13);
+}
+
+/* ------------------------------------------------------------
+   Alt → Neu  (Find & Replace in taskpane.html / detail.html)
+   #2d5a5a → var(--primary)      Kopf, Buttons, Fokus, aktive Tabs
+   #1a3838 → var(--surface)      Sidebar-Hintergrund (jetzt hell!)
+   #7dd4d4 → var(--primary)      aktiver Sidebar-Akzent
+   #e65100 → var(--accent)       Offene-Punkte-Rand
+   #fff8f0 → var(--tint-openpoint)  Offene-Punkte-Fläche
+   #f0f5f5 / #f5fafa → var(--surface)   Info-/Kontakt-Boxen
+   #c8dada → var(--border)       Box-Ränder
+   #ddd / #eee → var(--border)   Inputs, Trennlinien
+   #1a1a1a → var(--text)         Primärtext
+   #666 / #888 / #aaa → var(--text-muted)   Labels/Meta
+   #fff (Button-Text) → var(--on-primary)   Creme auf Olive
+   ------------------------------------------------------------ */

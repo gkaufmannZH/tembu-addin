@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html><head>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    Office.initialize = function() {};
+
+    function openContact(event) {
+      Office.context.ui.displayDialogAsync(
+        'https://localhost:5001/outlook-addin/taskpane.html?mode=contact',
+        { height: 80, width: 50, displayInIframe: false },
+        function() { event.completed(); }
+      );
+    }
+
+    function openCompany(event) {
+      Office.context.ui.displayDialogAsync(
+        'https://localhost:5001/outlook-addin/taskpane.html?mode=company',
+        { height: 80, width: 50, displayInIframe: false },
+        function() { event.completed(); }
+      );
+    }
+
+    function openRelations(event) {
+      Office.context.ui.displayDialogAsync(
+        'https://localhost:5001/outlook-addin/taskpane.html?mode=relations',
+        { height: 80, width: 50, displayInIframe: false },
+        function() { event.completed(); }
+      );
+    }
+
+    function openSettings(event) {
+      Office.context.ui.displayDialogAsync(
+        'https://localhost:5001/outlook-addin/taskpane.html?mode=settings',
+        { height: 80, width: 50, displayInIframe: false },
+        function() { event.completed(); }
+      );
+    }
+  </script>
+</head><body></body></html>

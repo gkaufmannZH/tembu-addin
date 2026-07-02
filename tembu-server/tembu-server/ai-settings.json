@@ -1,0 +1,8 @@
+{
+  "AI": {
+    "Provider": "gemini",
+    "ApiKey":   "",
+    "Model":    "",
+    "Endpoint": ""
+  }
+}

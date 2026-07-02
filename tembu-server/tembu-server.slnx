@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="tembu-server/tembu-server.csproj" />
+  <Project Path="tembu-usertool/tembu-usertool.csproj" />
+</Solution>

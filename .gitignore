@@ -1,0 +1,15 @@
+# .NET build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Lokale Secrets (echte Lizenz, nie committen — appsettings.json hat nur Platzhalter)
+appsettings.Local.json

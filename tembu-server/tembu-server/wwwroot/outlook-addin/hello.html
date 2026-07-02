@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Tembu</title>
+  <style>
+    body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background: #f3f2f1; gap: 8px; }
+    h1 { font-size: 2rem; color: #333; }
+    .build { font-size: 0.85rem; color: #999; }
+  </style>
+</head>
+<body>
+  <h1>Hello World</h1>
+  <div class="build" id="buildLabel"></div>
+  <script src="../shared/version.js"></script>
+  <script>document.getElementById('buildLabel').textContent = 'Build ' + TEMBU_BUILD;</script>
+</body>
+</html>

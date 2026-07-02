@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xsi:type="MailApp">
+
+  <Id>f4f28c08-de59-4eef-b70f-63e91fd283e0</Id>
+  <Version>2.4.0.0</Version>
+  <ProviderName>Tembu</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Tembu Rumbles (local)" />
+  <Description DefaultValue="Create a Rumble from Outlook - v20260701b (local)" />
+  <IconUrl DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+  <HighResolutionIconUrl DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+  <SupportUrl DefaultValue="https://tembu.app" />
+
+  <AppDomains>
+    <AppDomain>https://localhost:5001</AppDomain>
+    <AppDomain>https://login.microsoftonline.com</AppDomain>
+    <AppDomain>https://gkaufmannzh.github.io</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="Mailbox" />
+    </Sets>
+  </Requirements>
+
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+        <RequestedHeight>450</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <Permissions>ReadWriteItem</Permissions>
+
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message"     FormType="Read" />
+    <Rule xsi:type="ItemIs" ItemType="Message"     FormType="Edit" />
+    <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Read" />
+    <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Edit" />
+  </Rule>
+
+  <!-- V1_0: Ältere Outlook-Versionen -->
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.3">
+        <bt:Set Name="Mailbox" />
+      </bt:Sets>
+    </Requirements>
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="msgReadGroup">
+                <Label resid="GroupLabel" />
+                <Control xsi:type="Button" id="msgReadButton">
+                  <Label resid="ButtonLabel" />
+                  <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                  <Action xsi:type="ShowTaskpane">
+<SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+          <ExtensionPoint xsi:type="AppointmentOrganizerCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="apptOrgGroup">
+                <Label resid="GroupLabel" />
+                <Control xsi:type="Button" id="apptOrgButton">
+                  <Label resid="ButtonLabel" />
+                  <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                  <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                  <Action xsi:type="ShowTaskpane">
+<SourceLocation resid="Taskpane.Appt.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GroupLabel" DefaultValue="Tembu" />
+        <bt:String id="ButtonLabel" DefaultValue="Tembu" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="ButtonTooltip" DefaultValue="Open Tembu" />
+      </bt:LongStrings>
+    </Resources>
+
+    <!-- V1_1: Modernes Outlook mit SupportsPinning -->
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.5">
+          <bt:Set Name="Mailbox" />
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <FunctionFile resid="Commands.Url" />
+
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="msgReadGroupV11">
+                  <Label resid="GroupLabel" />
+                  <Control xsi:type="Button" id="msgReadButtonV11">
+                    <Label resid="ButtonLabel" />
+                    <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                    <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                    <Action xsi:type="ShowTaskpane">
+    <SourceLocation resid="Taskpane.Url" />
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+
+            <ExtensionPoint xsi:type="AppointmentOrganizerCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="apptOrgGroupV11">
+                  <Label resid="GroupLabel" />
+                  <Control xsi:type="Button" id="apptOrgButtonV11">
+                    <Label resid="ButtonLabel" />
+                    <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                    <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                    <Action xsi:type="ShowTaskpane">
+    <SourceLocation resid="Taskpane.Appt.Url" />
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+
+            <ExtensionPoint xsi:type="AppointmentAttendeeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="apptAttGroupV11">
+                  <Label resid="GroupLabel" />
+                  <Control xsi:type="Button" id="apptAttButtonV11">
+                    <Label resid="ButtonLabel" />
+                    <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
+                    <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                    <Action xsi:type="ShowTaskpane">
+    <SourceLocation resid="Taskpane.Appt.Url" />
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="Icon.16" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.32" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.80" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
+          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="GroupLabel" DefaultValue="Tembu" />
+          <bt:String id="ButtonLabel" DefaultValue="Tembu" />
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="ButtonTooltip" DefaultValue="Open Tembu" />
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
+
+  </VersionOverrides>
+</OfficeApp>

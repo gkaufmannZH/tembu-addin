@@ -14,25 +14,37 @@ const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Rea
 
 const msalInstance = new msal.PublicClientApplication({
   auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
-  // storeAuthStateInCookie: der Office-Dialog-WebView übersteht die Navigation zu
-  // login.microsoftonline.com und zurück nicht zuverlässig mit sessionStorage allein –
-  // ohne dieses Flag verliert MSAL den PKCE/State und handleRedirectPromise() hängt/loopt.
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true },
 });
 
+function sendSuccess(result) {
+  Office.context.ui.messageParent(JSON.stringify({
+    success: true,
+    token: result.accessToken,
+    account: { name: result.account.name, username: result.account.username },
+  }));
+}
+
+// loginPopup statt loginRedirect: das Office-Dialogfenster navigiert dabei nie weg,
+// sondern öffnet nur ein zusätzliches Popup für login.microsoftonline.com. So bleibt
+// der Office.js-Host-Kontext (inkl. _host_Info in der URL) erhalten – bei loginRedirect
+// ging er beim Zurücknavigieren verloren und messageParent() erreichte die Taskpane
+// danach nicht mehr (kein Fehler, einfach kein Effekt = "hängt nach Kontoauswahl").
 Office.initialize = async function () {
   try {
     if (msalInstance.initialize) await msalInstance.initialize();
-    const response = await msalInstance.handleRedirectPromise();
-    if (response && response.accessToken) {
-      Office.context.ui.messageParent(JSON.stringify({
-        success: true,
-        token: response.accessToken,
-        account: { name: response.account.name, username: response.account.username },
-      }));
-      return;
+
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+        sendSuccess(result);
+        return;
+      } catch {}
     }
-    await msalInstance.loginRedirect({ scopes: SCOPES, prompt: 'select_account' });
+
+    const result = await msalInstance.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
+    sendSuccess(result);
   } catch (e) {
     Office.context.ui.messageParent(JSON.stringify({ success: false, error: e.message }));
   }

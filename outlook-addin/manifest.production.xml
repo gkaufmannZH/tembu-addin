@@ -69,7 +69,6 @@
                   <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                   <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>TembuTaskpane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Url" />
                   </Action>
                 </Control>
@@ -86,7 +85,6 @@
                   <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                   <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <TaskpaneId>TembuTaskpane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Appt.Url" />
                   </Action>
                 </Control>
@@ -138,7 +136,6 @@
                     <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                     <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
-                      <TaskpaneId>TembuTaskpane</TaskpaneId>
                       <SourceLocation resid="Taskpane.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
@@ -156,7 +153,6 @@
                     <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                     <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
-                      <TaskpaneId>TembuTaskpane</TaskpaneId>
                       <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
@@ -174,7 +170,6 @@
                     <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                     <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
-                      <TaskpaneId>TembuTaskpane</TaskpaneId>
                       <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>

@@ -11,12 +11,14 @@ public class AnalyzeController : ControllerBase
     private readonly AiService _ai;
     private readonly UserListService _users;
     private readonly GraphAuthService _graphAuth;
+    private readonly ILogger<AnalyzeController> _logger;
 
-    public AnalyzeController(AiService ai, UserListService users, GraphAuthService graphAuth)
+    public AnalyzeController(AiService ai, UserListService users, GraphAuthService graphAuth, ILogger<AnalyzeController> logger)
     {
         _ai        = ai;
         _users     = users;
         _graphAuth = graphAuth;
+        _logger    = logger;
     }
 
     // Prüft den Bearer-Token gegen Microsoft Graph statt einem vom Client
@@ -25,6 +27,10 @@ public class AnalyzeController : ControllerBase
     {
         var header = Request.Headers.Authorization.ToString();
         var token  = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? header["Bearer ".Length..] : null;
+
+        if (string.IsNullOrEmpty(token))
+            _logger.LogWarning("AnalyzeController: kein/leerer Authorization-Header. Vorhandene Header: {Headers} | Origin: {Origin}",
+                string.Join(", ", Request.Headers.Keys), Request.Headers.Origin.ToString());
 
         var email = await _graphAuth.GetVerifiedEmailAsync(token);
         if (email == null)

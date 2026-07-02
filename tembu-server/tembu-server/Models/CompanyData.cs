@@ -2,7 +2,7 @@ namespace tembu_server.Models;
 
 public class CompanyData
 {
-    public string UserEmail   { get; set; } = "";
+    public string Lang { get; set; } = "";
     public string CompanyName { get; set; } = "";
     public string Domain      { get; set; } = "";
     public List<CompanyContact> Contacts { get; set; } = [];

@@ -877,10 +877,12 @@ function openDetailDialog() {
   const contactName = document.getElementById('contactName')?.value?.trim();
   if (!contactName) { showStatus(TI18n.t('taskpane.contactSelectFirst'), 'error'); return; }
 
-  // Dialog-localStorage ist in Outlook Desktop isoliert → Token/Server-URL/Nutzer-E-Mail direkt im URL-Parameter übergeben
+  // Dialog-localStorage ist in Outlook Desktop isoliert → Token/Server-URL direkt im URL-Parameter übergeben.
+  // Die Nutzeridentität für den Server wird NICHT hier mitgegeben, sondern serverseitig aus dem
+  // Graph-Token (t) verifiziert — ein Client-Parameter wäre nicht vertrauenswürdig.
   const params = new URLSearchParams({
     name: contactName, email: _contactEmail || '', t: _token || '',
-    srv: getServerUrl(), ue: _account?.username || '', _v: '20260701a',
+    srv: getServerUrl(), _v: '20260701a',
   });
   const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/detail-open.html?${params.toString()}`;
 
@@ -896,7 +898,7 @@ function openDetailDialog() {
 function openCompanyDialog() {
   const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
   if (!domain) { showStatus(TI18n.t('taskpane.noCompanyDomain'), 'error'); return; }
-  const params = new URLSearchParams({ domain, t: _token || '', srv: getServerUrl(), ue: _account?.username || '', _v: '20260701a' });
+  const params = new URLSearchParams({ domain, t: _token || '', srv: getServerUrl(), _v: '20260701a' });
   const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/company-open.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
@@ -908,7 +910,7 @@ function openCompanyDialog() {
 }
 
 function openBatchDialog() {
-  const params = new URLSearchParams({ t: _token || '', srv: getServerUrl(), ue: _account?.username || '', _v: '20260701a' });
+  const params = new URLSearchParams({ t: _token || '', srv: getServerUrl(), _v: '20260701a' });
   const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/batch-open.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {

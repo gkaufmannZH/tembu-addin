@@ -2,7 +2,7 @@ namespace tembu_server.Models;
 
 public class ContactData
 {
-    public string UserEmail { get; set; } = "";
+    public string Lang { get; set; } = "";
     public string ContactName { get; set; } = "";
     public string ContactEmail { get; set; } = "";
     public List<EmailItem> Emails { get; set; } = [];

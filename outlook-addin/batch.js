@@ -26,7 +26,6 @@ const SKIP_LOCAL = [
 
 let _token     = '';
 let _serverUrl = '';
-let _userEmail = '';
 let _cancelled = false;
 let _running   = false;
 let _ownEmail  = '';
@@ -38,7 +37,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   const p = new URLSearchParams(window.location.search);
   _token     = p.get('t')   || '';
   _serverUrl = (p.get('srv') || '').trim().replace(/\/+$/, '');
-  _userEmail = p.get('ue')  || '';
   if (!_token) {
     document.getElementById('folderList').innerHTML =
       `<span class="folder-loading" style="color:#c00">${escHtml(TI18n.t('batch.noTokenError'))}</span>`;
@@ -282,9 +280,9 @@ async function analyzeContact(email, name, since) {
 
   const res = await fetch(`${_serverUrl}/api/analyze`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_token}` },
     body: JSON.stringify({
-      userEmail: _userEmail, contactName: name, contactEmail: email,
+      lang: TI18n.getLang(), contactName: name, contactEmail: email,
       emails:   emails.map(e   => ({ dateStr: e.date, direction: e.direction, subject: e.subject, preview: e.preview })),
       meetings: meetings.map(m => ({ dateStr: m.date, subject: m.subject, durationMin: m.duration })),
       rumbles:  [],

@@ -18,7 +18,6 @@ const esc = TCore.esc;
 
 let _token       = null;
 let _serverUrl   = '';
-let _userEmail   = '';
 let _domain      = '';
 let _companyName = '';
 let _cacheKey    = '';
@@ -31,7 +30,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   _domain      = (params.get('domain') || '').toLowerCase().trim();
   _companyName = params.get('company') || deriveCompanyName(_domain);
   _serverUrl   = (params.get('srv') || '').trim().replace(/\/+$/, '');
-  _userEmail   = params.get('ue')   || '';
   _cacheKey    = 'company:' + _domain;
 
   document.getElementById('headerName').textContent   = _companyName;
@@ -260,7 +258,7 @@ async function fetchMeetingsForContacts(contacts, since, topPerContact = 50) {
 // Läuft server-seitig über tembu-server /api/analyze/company.
 function toCompanyData(data) {
   return {
-    userEmail:   _userEmail,
+    lang:        TI18n.getLang(),
     companyName: _companyName,
     domain:      _domain,
     contacts: data.contacts.map(c => ({ name: c.name, email: c.email })),
@@ -278,7 +276,7 @@ async function runAI(data) {
   try {
     const res = await fetch(`${_serverUrl}/api/analyze/company`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_token}` },
       body: JSON.stringify(toCompanyData(data)),
     });
     if (!res.ok) {
@@ -370,7 +368,7 @@ function renderContacts(data) {
   const list = Object.values(byEmail).sort((a,b) => b.count - a.count);
   if (!list.length) { el.innerHTML = `<div class="empty-state">${esc(TI18n.t('company.noContactsFound'))}</div>`; return; }
 
-  const detailBase = `detail-open.html?t=${encodeURIComponent(_token || '')}&srv=${encodeURIComponent(_serverUrl)}&ue=${encodeURIComponent(_userEmail)}`;
+  const detailBase = `detail-open.html?t=${encodeURIComponent(_token || '')}&srv=${encodeURIComponent(_serverUrl)}`;
   el.innerHTML = list.map(c => {
     const initials = (c.name || c.email).split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const link = `${detailBase}&name=${encodeURIComponent(c.name || '')}&email=${encodeURIComponent(c.email)}`;

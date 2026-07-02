@@ -10,9 +10,9 @@
   <ProviderName>Tembu</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Tembu Rumbles (local)" />
-  <Description DefaultValue="Create a Rumble from Outlook - v20260701b (local)" />
-  <IconUrl DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-  <HighResolutionIconUrl DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+  <Description DefaultValue="Create a Rumble from Outlook – v20260701a (local)" />
+  <IconUrl DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
   <SupportUrl DefaultValue="https://tembu.app" />
 
   <AppDomains>
@@ -34,7 +34,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+        <SourceLocation DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -59,6 +59,8 @@
     <Hosts>
       <Host xsi:type="MailHost">
         <DesktopFormFactor>
+          <FunctionFile resid="Commands.Url" />
+
           <ExtensionPoint xsi:type="MessageReadCommandSurface">
             <OfficeTab id="TabDefault">
               <Group id="msgReadGroup">
@@ -68,7 +70,8 @@
                   <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                   <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                   <Action xsi:type="ShowTaskpane">
-<SourceLocation resid="Taskpane.Url" />
+                    <TaskpaneId>TembuTaskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
                   </Action>
                 </Control>
               </Group>
@@ -84,7 +87,8 @@
                   <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                   <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                   <Action xsi:type="ShowTaskpane">
-<SourceLocation resid="Taskpane.Appt.Url" />
+                    <TaskpaneId>TembuTaskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Appt.Url" />
                   </Action>
                 </Control>
               </Group>
@@ -96,14 +100,14 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.16" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
-        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
+        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Tembu" />
@@ -135,7 +139,8 @@
                     <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                     <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
-    <SourceLocation resid="Taskpane.Url" />
+                      <TaskpaneId>TembuTaskpane</TaskpaneId>
+                      <SourceLocation resid="Taskpane.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
@@ -152,7 +157,8 @@
                     <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                     <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
-    <SourceLocation resid="Taskpane.Appt.Url" />
+                      <TaskpaneId>TembuTaskpane</TaskpaneId>
+                      <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
@@ -169,7 +175,8 @@
                     <Supertip><Title resid="ButtonLabel" /><Description resid="ButtonTooltip" /></Supertip>
                     <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
                     <Action xsi:type="ShowTaskpane">
-    <SourceLocation resid="Taskpane.Appt.Url" />
+                      <TaskpaneId>TembuTaskpane</TaskpaneId>
+                      <SourceLocation resid="Taskpane.Appt.Url" />
                       <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
@@ -182,14 +189,14 @@
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon.16" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-          <bt:Image id="Icon.32" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
-          <bt:Image id="Icon.80" DefaultValue="https://gkaufmannzh.github.io/tembu-addin/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.16" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.32" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
+          <bt:Image id="Icon.80" DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
         </bt:Images>
         <bt:Urls>
           <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
-          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
-          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701b" />
+          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
+          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Tembu" />

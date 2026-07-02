@@ -4,6 +4,17 @@ namespace tembu_server.Services;
 
 public static class PromptBuilder
 {
+    // Enum-Werte MÜSSEN Englisch bleiben — das Client-Rendering (detail.js/company.js)
+    // vergleicht z.B. a.sentiment === 'positive' bzw. t.status === 'open' direkt.
+    // Nur die Freitext-Felder (summary/nextStep/...) sollen in der Nutzersprache sein.
+    private static string LanguageInstruction(string? lang) => lang switch
+    {
+        "en" => "Respond in English.",
+        "fr" => "Réponds en français.",
+        "es" => "Responde en español.",
+        _    => "Antworte auf Deutsch.",
+    };
+
     public static string Build(ContactData data)
     {
         var today = DateTime.Now.ToString("dd.MM.yyyy");
@@ -29,10 +40,10 @@ public static class PromptBuilder
         var jsonTemplate =
             "{\n" +
             "  \"summary\": \"2-3 Saetze zur Beziehung, Haeufigkeit, Ton\",\n" +
-            "  \"sentiment\": \"positiv|neutral|negativ\",\n" +
+            "  \"sentiment\": \"positive|neutral|negative\",\n" +
             "  \"openPoints\": [\"Offener Punkt 1\"],\n" +
             "  \"themes\": [\n" +
-            "    { \"name\": \"Thema\", \"status\": \"offen|abgeschlossen\", \"summary\": \"Kurzbeschreibung\",\n" +
+            "    { \"name\": \"Thema\", \"status\": \"open|done\", \"summary\": \"Kurzbeschreibung\",\n" +
             "      \"interactions\": [{\"date\":\"YYYY-MM-DD\",\"type\":\"email|meeting\",\"subject\":\"Betreff\"}] }\n" +
             "  ],\n" +
             "  \"nextStep\": \"Konkrete Empfehlung fuer naechstes Gespraech\",\n" +
@@ -40,7 +51,7 @@ public static class PromptBuilder
             "}";
 
         return
-            "Du bist ein persoenlicher Business-Assistent. Heute ist " + today + ".\n" +
+            "Du bist ein persoenlicher Business-Assistent. Heute ist " + today + ". " + LanguageInstruction(data.Lang) + "\n" +
             "Analysiere alle Interaktionen mit \"" + data.ContactName + "\" (" + data.ContactEmail + ").\n\n" +
             blocks +
             "Antworte NUR mit validem JSON (kein Markdown).\n" +
@@ -72,17 +83,17 @@ public static class PromptBuilder
         var jsonTemplate =
             "{\n" +
             "  \"summary\": \"2-3 Saetze zur Gesamtbeziehung mit der Firma\",\n" +
-            "  \"sentiment\": \"positiv|neutral|negativ\",\n" +
+            "  \"sentiment\": \"positive|neutral|negative\",\n" +
             "  \"openPoints\": [\"Offener Punkt 1\"],\n" +
             "  \"themes\": [\n" +
-            "    { \"name\": \"Thema\", \"status\": \"offen|abgeschlossen\", \"summary\": \"Kurzbeschreibung\", \"contacts\": [\"Name1\",\"Name2\"],\n" +
+            "    { \"name\": \"Thema\", \"status\": \"open|done\", \"summary\": \"Kurzbeschreibung\", \"contacts\": [\"Name1\",\"Name2\"],\n" +
             "      \"interactions\": [{\"date\":\"YYYY-MM-DD\",\"type\":\"email|meeting\",\"contact\":\"Name\",\"subject\":\"Betreff\"}] }\n" +
             "  ],\n" +
             "  \"nextStep\": \"Konkrete Empfehlung fuer naechsten Schritt mit dieser Firma\"\n" +
             "}";
 
         return
-            "Du bist ein Business-Assistent. Heute ist " + today + ".\n" +
+            "Du bist ein Business-Assistent. Heute ist " + today + ". " + LanguageInstruction(data.Lang) + "\n" +
             "Analysiere meine Geschaeftsbeziehung mit der Firma \"" + data.CompanyName + "\" (Domain: " + data.Domain + ").\n" +
             "Bekannte Kontakte: " + contactNames + ".\n\n" +
             blocks +

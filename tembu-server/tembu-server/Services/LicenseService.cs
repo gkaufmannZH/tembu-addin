@@ -6,11 +6,9 @@ namespace tembu_server.Services;
 
 public class LicenseService
 {
-    // Geheimnis — VOR Produktionseinsatz ändern, danach NIE mehr ändern
-    private const string Secret = "tembu-2024-x7k9-secure";
     private const string Prefix = "TEMBU";
 
-    public static LicenseInfo Validate(string email, string licenseKey, string expiry)
+    public static LicenseInfo Validate(string email, string licenseKey, string expiry, string secret)
     {
         var info = new LicenseInfo();
 
@@ -21,7 +19,14 @@ public class LicenseService
             return info;
         }
 
-        var expected = GenerateKey(email, expiry);
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            info.IsValid = false;
+            info.ErrorMessage = "License:Secret fehlt (appsettings.Local.json). Ohne dieses Secret kann kein Lizenzschlüssel geprüft werden.";
+            return info;
+        }
+
+        var expected = GenerateKey(email, expiry, secret);
         if (!string.Equals(licenseKey.Trim(), expected, StringComparison.OrdinalIgnoreCase))
         {
             info.IsValid = false;
@@ -49,10 +54,10 @@ public class LicenseService
         return info;
     }
 
-    public static string GenerateKey(string email, string expiry)
+    public static string GenerateKey(string email, string expiry, string secret)
     {
-        var input = $"{email.ToLower().Trim()}|{expiry}|{Secret}";
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(Secret));
+        var input = $"{email.ToLower().Trim()}|{expiry}|{secret}";
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(input));
         var hex = BitConverter.ToString(hash).Replace("-", "").ToUpper();
         return $"{Prefix}-{hex[..4]}-{hex[4..8]}-{hex[8..12]}-{hex[12..16]}";

@@ -3,16 +3,25 @@ using System.Text;
 using System.Text.Json;
 
 // ── Konstanten (identisch mit tembu-server) ──────────────────────────────────
-const string Secret = "tembu-2024-x7k9-secure";
 const string Prefix = "TEMBU";
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 Console.Title = "Tembu User Tool";
 Console.ForegroundColor = ConsoleColor.Cyan;
 Console.WriteLine("╔══════════════════════════════════════╗");
-Console.WriteLine("║     TEMBU USER TOOL  v2.1            ║");
+Console.WriteLine("║     TEMBU USER TOOL  v2.2            ║");
 Console.WriteLine("╚══════════════════════════════════════╝");
 Console.ResetColor();
+Console.WriteLine();
+
+// Secret NICHT mehr hartcodiert — muss mit tembu-server's License:Secret
+// (appsettings.Local.json) übereinstimmen. Per Env-Var überspringbar.
+var Secret = Environment.GetEnvironmentVariable("TEMBU_LICENSE_SECRET");
+if (string.IsNullOrEmpty(Secret))
+{
+    Console.Write("License-Secret (identisch mit tembu-server License:Secret, Eingabe versteckt): ");
+    Secret = ReadMasked();
+}
 Console.WriteLine();
 
 // ── Modus wählen ─────────────────────────────────────────────────────────────
@@ -21,6 +30,7 @@ Console.WriteLine("  [1]  Neue users.dat erstellen");
 Console.WriteLine("  [2]  Lizenzschlüssel generieren");
 Console.WriteLine("  [3]  Bestehende users.dat anzeigen");
 Console.WriteLine("  [4]  KI-Einstellungen bearbeiten (ai-settings.json)");
+Console.WriteLine("  [5]  Erlaubte Server-Origins bearbeiten (cors-settings.json)");
 Console.Write("\nAuswahl: ");
 var mode = Console.ReadLine()?.Trim();
 Console.WriteLine();
@@ -31,6 +41,7 @@ switch (mode)
     case "2": GenerateLicenseKey(); break;
     case "3": ShowUserFile(); break;
     case "4": EditAiSettings(); break;
+    case "5": EditCorsSettings(); break;
     default:
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("Ungültige Auswahl.");
@@ -93,7 +104,7 @@ void CreateUserFile()
         Users    = emails,
     };
 
-    var encrypted = Encrypt(userList);
+    var encrypted = Encrypt(userList, Secret);
     File.WriteAllBytes(path, encrypted);
 
     Console.ForegroundColor = ConsoleColor.Green;
@@ -118,7 +129,7 @@ void GenerateLicenseKey()
     Console.Write("Ablaufdatum (YYYY-MM-DD, z.B. 2027-12-31): ");
     var expiry = Console.ReadLine()?.Trim() ?? "";
 
-    var key = GenerateKey(email, expiry);
+    var key = GenerateKey(email, expiry, Secret);
 
     Console.ForegroundColor = ConsoleColor.Green;
     Console.WriteLine();
@@ -146,7 +157,7 @@ void ShowUserFile()
     try
     {
         var data = File.ReadAllBytes(path);
-        var list = Decrypt(data);
+        var list = Decrypt(data, Secret);
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"Kunde:   {list.Customer}");
         Console.WriteLine($"Erstellt: {list.Created}");
@@ -274,16 +285,98 @@ static string ReadMasked()
     return sb.ToString();
 }
 
+void EditCorsSettings()
+{
+    Console.ForegroundColor = ConsoleColor.White;
+    Console.WriteLine("─── Erlaubte Server-Origins bearbeiten ──────────────────");
+    Console.ResetColor();
+    Console.WriteLine("Legt fest, von welchen Web-Adressen aus der Browser Anfragen an tembu-server");
+    Console.WriteLine("stellen darf (CORS). Betrifft z.B. gkaufmannzh.github.io oder localhost.");
+    Console.WriteLine();
+
+    Console.Write("Pfad zur cors-settings.json (Enter = cors-settings.json im aktuellen Verzeichnis): ");
+    var path = Console.ReadLine()?.Trim();
+    if (string.IsNullOrEmpty(path)) path = "cors-settings.json";
+
+    var origins = new List<string>();
+    if (File.Exists(path))
+    {
+        try
+        {
+            var loaded = JsonSerializer.Deserialize<CorsSettingsFile>(File.ReadAllText(path));
+            if (loaded?.Cors?.AllowedOrigins != null) origins = [.. loaded.Cors.AllowedOrigins];
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Warnung: Datei konnte nicht gelesen werden ({ex.Message}), starte mit leerer Liste.");
+            Console.ResetColor();
+        }
+    }
+
+    while (true)
+    {
+        Console.WriteLine();
+        Console.WriteLine("Aktuell erlaubt:");
+        if (origins.Count == 0) Console.WriteLine("  (keine)");
+        for (var i = 0; i < origins.Count; i++)
+            Console.WriteLine($"  [{i + 1}]  {origins[i]}");
+
+        Console.WriteLine();
+        Console.WriteLine("  [a]  Origin hinzufügen");
+        Console.WriteLine("  [r]  Origin entfernen (Nummer)");
+        Console.WriteLine("  [s]  Speichern & Beenden");
+        Console.Write("Auswahl: ");
+        var choice = Console.ReadLine()?.Trim().ToLower();
+
+        if (choice == "a")
+        {
+            Console.Write("Neue Origin (z.B. https://kunde.example.com): ");
+            var origin = Console.ReadLine()?.Trim().TrimEnd('/');
+            if (!string.IsNullOrEmpty(origin) && (origin.StartsWith("https://") || origin.StartsWith("http://")))
+            {
+                if (!origins.Contains(origin, StringComparer.OrdinalIgnoreCase)) origins.Add(origin);
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Ungültige Origin, muss mit http:// oder https:// beginnen.");
+                Console.ResetColor();
+            }
+        }
+        else if (choice == "r")
+        {
+            Console.Write("Nummer zum Entfernen: ");
+            if (int.TryParse(Console.ReadLine()?.Trim(), out var idx) && idx >= 1 && idx <= origins.Count)
+                origins.RemoveAt(idx - 1);
+        }
+        else if (choice == "s")
+        {
+            break;
+        }
+    }
+
+    var result = new CorsSettingsFile { Cors = new CorsSettingsSection { AllowedOrigins = [.. origins] } };
+    File.WriteAllText(path, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine();
+    Console.WriteLine($"✓ Gespeichert: {Path.GetFullPath(path)}");
+    Console.WriteLine($"  {origins.Count} Origin(s)");
+    Console.WriteLine("  Läuft tembu-server bereits, übernimmt er die Änderung sofort (kein Neustart nötig).");
+    Console.ResetColor();
+}
+
 // ── Crypto ────────────────────────────────────────────────────────────────────
 
-static byte[] DeriveKey()
-    => SHA256.HashData(Encoding.UTF8.GetBytes(Secret));
+static byte[] DeriveKey(string secret)
+    => SHA256.HashData(Encoding.UTF8.GetBytes(secret));
 
-static byte[] Encrypt(UserListData list)
+static byte[] Encrypt(UserListData list, string secret)
 {
     var json      = JsonSerializer.Serialize(list);
     var plaintext = Encoding.UTF8.GetBytes(json);
-    var key       = DeriveKey();
+    var key       = DeriveKey(secret);
 
     var nonce      = new byte[AesGcm.NonceByteSizes.MaxSize];
     var tag        = new byte[AesGcm.TagByteSizes.MaxSize];
@@ -301,7 +394,7 @@ static byte[] Encrypt(UserListData list)
     return result;
 }
 
-static UserListData Decrypt(byte[] data)
+static UserListData Decrypt(byte[] data, string secret)
 {
     var nonceSize  = AesGcm.NonceByteSizes.MaxSize;
     var tagSize    = AesGcm.TagByteSizes.MaxSize;
@@ -311,16 +404,16 @@ static UserListData Decrypt(byte[] data)
     var ciphertext = data[(nonceSize + tagSize)..];
     var plaintext  = new byte[ciphertext.Length];
 
-    using var aes = new AesGcm(DeriveKey(), AesGcm.TagByteSizes.MaxSize);
+    using var aes = new AesGcm(DeriveKey(secret), AesGcm.TagByteSizes.MaxSize);
     aes.Decrypt(nonce, ciphertext, tag, plaintext);
 
     return JsonSerializer.Deserialize<UserListData>(plaintext)!;
 }
 
-static string GenerateKey(string email, string expiry)
+static string GenerateKey(string email, string expiry, string secret)
 {
-    var input = $"{email.ToLower().Trim()}|{expiry}|{Secret}";
-    using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(Secret));
+    var input = $"{email.ToLower().Trim()}|{expiry}|{secret}";
+    using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
     var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(input));
     var hex  = BitConverter.ToString(hash).Replace("-", "").ToUpper();
     return $"{Prefix}-{hex[..4]}-{hex[4..8]}-{hex[8..12]}-{hex[12..16]}";
@@ -347,4 +440,15 @@ record AiSettingsSection
     public string ApiKey   { get; init; } = "";
     public string Model    { get; init; } = "";
     public string Endpoint { get; init; } = "";
+}
+
+// Struktur muss zu tembu-server\Models\CorsSettings.cs / Program.cs-Sektion "Cors" passen
+record CorsSettingsFile
+{
+    public CorsSettingsSection Cors { get; init; } = new();
+}
+
+record CorsSettingsSection
+{
+    public string[] AllowedOrigins { get; init; } = [];
 }

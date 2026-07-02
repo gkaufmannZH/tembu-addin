@@ -7,8 +7,9 @@ namespace tembu_server.Services;
 
 public class UserListService
 {
-    // Gleicher Secret wie LicenseService — nie ändern
-    private const string Secret = "tembu-2024-x7k9-secure";
+    // Gleicher Secret wie LicenseService — kommt aus License:Secret (appsettings.Local.json),
+    // NICHT hartcodiert, damit er nicht im öffentlichen Repo landet.
+    private readonly string _secret;
 
     private readonly HashSet<string> _authorizedUsers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<UserListService> _logger;
@@ -17,6 +18,7 @@ public class UserListService
     public UserListService(ILogger<UserListService> logger, IConfiguration config)
     {
         _logger = logger;
+        _secret = config["License:Secret"] ?? "";
         var path = config["UserList:Path"] ?? "users.dat";
         Load(path);
     }
@@ -58,32 +60,8 @@ public class UserListService
         }
     }
 
-    // ── Verschlüsseln (für Generator-Tool) ────────────────────────────────
-    public static byte[] Encrypt(UserList list)
-    {
-        var json      = JsonSerializer.Serialize(list);
-        var plaintext = Encoding.UTF8.GetBytes(json);
-        var key       = DeriveKey();
-
-        var nonce      = new byte[AesGcm.NonceByteSizes.MaxSize];
-        var tag        = new byte[AesGcm.TagByteSizes.MaxSize];
-        var ciphertext = new byte[plaintext.Length];
-
-        RandomNumberGenerator.Fill(nonce);
-
-        using var aes = new AesGcm(key, AesGcm.TagByteSizes.MaxSize);
-        aes.Encrypt(nonce, plaintext, ciphertext, tag);
-
-        // Format: [nonce 12 bytes][tag 16 bytes][ciphertext]
-        var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
-        Buffer.BlockCopy(nonce,       0, result, 0,                         nonce.Length);
-        Buffer.BlockCopy(tag,         0, result, nonce.Length,              tag.Length);
-        Buffer.BlockCopy(ciphertext,  0, result, nonce.Length + tag.Length, ciphertext.Length);
-        return result;
-    }
-
     // ── Entschlüsseln ─────────────────────────────────────────────────────
-    private static string Decrypt(byte[] data)
+    private string Decrypt(byte[] data)
     {
         var nonceSize  = AesGcm.NonceByteSizes.MaxSize;
         var tagSize    = AesGcm.TagByteSizes.MaxSize;
@@ -100,6 +78,6 @@ public class UserListService
         return Encoding.UTF8.GetString(plaintext);
     }
 
-    private static byte[] DeriveKey()
-        => SHA256.HashData(Encoding.UTF8.GetBytes(Secret));
+    private byte[] DeriveKey()
+        => SHA256.HashData(Encoding.UTF8.GetBytes(_secret));
 }

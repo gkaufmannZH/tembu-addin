@@ -11,7 +11,6 @@ const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;
 
 let _token        = null;
 let _serverUrl    = '';
-let _userEmail    = '';
 let _contactName  = '';
 let _contactEmail = '';
 let _cacheKey     = '';
@@ -45,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   _contactName    = params.get('name')  || '';
   _contactEmail   = params.get('email') || '';
   _serverUrl      = (params.get('srv')  || '').trim().replace(/\/+$/, '');
-  _userEmail      = params.get('ue')    || '';
   _cacheKey       = (_contactEmail || _contactName).toLowerCase().trim();
 
   document.getElementById('headerName').textContent = _contactName || TI18n.t('detail.headerNameFallback');
@@ -404,7 +402,7 @@ async function fetchRumbles() {
 // verwaltet Provider/Key zentral in ai-settings.json, der Client braucht keinen Key mehr.
 function toContactData(data) {
   return {
-    userEmail:    _userEmail,
+    lang:         TI18n.getLang(),
     contactName:  _contactName,
     contactEmail: _contactEmail,
     emails:   data.emails.map(e   => ({ dateStr: e.date, direction: e.direction, subject: e.subject, preview: e.preview })),
@@ -430,7 +428,7 @@ async function runAI(data) {
   try {
     const res = await fetch(`${_serverUrl}/api/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_token}` },
       body: JSON.stringify(toContactData(data)),
     });
     if (!res.ok) {

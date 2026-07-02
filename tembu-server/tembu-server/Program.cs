@@ -12,28 +12,28 @@ builder.Services.Configure<AiSettings>(builder.Configuration.GetSection("AI"));
 // enthält nur Platzhalter, damit kein echter Key ins Repo gelangt.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
+// Erlaubte CORS-Origins — separate Datei, Live-Reload über DynamicCorsPolicyProvider
+// (Admin kann sie über tembu-usertool bearbeiten, ohne den Server neu zu starten).
+builder.Configuration.AddJsonFile("cors-settings.json", optional: true, reloadOnChange: true);
+builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection("Cors"));
+
 builder.Services.AddControllers();
 builder.Services.AddSingleton<AiService>();
 builder.Services.AddSingleton<UserListService>();
+builder.Services.AddSingleton<GraphAuthService>();
 builder.Host.UseWindowsService();
 
-builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
-    .WithOrigins(
-        "https://localhost:5001",
-        "https://outlook.office.com",
-        "https://outlook.office365.com",
-        "https://outlook.live.com",
-        "https://gkaufmannzh.github.io")
-    .AllowAnyHeader()
-    .AllowAnyMethod()));
+builder.Services.AddCors();
+builder.Services.AddSingleton<Microsoft.AspNetCore.Cors.Infrastructure.ICorsPolicyProvider, DynamicCorsPolicyProvider>();
 
 // ── Lizenzprüfung beim Start ───────────────────────────────────────────────
 var cfg      = builder.Configuration;
 var email  = cfg["License:Email"]  ?? "";
 var key    = cfg["License:Key"]    ?? "";
 var expiry = cfg["License:Expiry"] ?? "";
+var secret = cfg["License:Secret"] ?? "";
 
-var license = LicenseService.Validate(email, key, expiry);
+var license = LicenseService.Validate(email, key, expiry, secret);
 if (!license.IsValid)
 {
     Console.ForegroundColor = ConsoleColor.Red;

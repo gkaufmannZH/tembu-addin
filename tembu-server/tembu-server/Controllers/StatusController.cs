@@ -17,12 +17,13 @@ public class StatusController : ControllerBase
         _users   = users;
     }
 
+    // Unauthentifiziert erreichbar (Health-Check) — daher keine identifizierenden
+    // Lizenzdaten (E-Mail) preisgeben, nur Betriebszustand.
     [HttpGet]
     public IActionResult Get() => Ok(new
     {
         status           = "ok",
         version          = "2.0",
-        licenseEmail     = _license.Email,
         licenseExpiry    = _license.ExpiryDate.ToString("yyyy-MM-dd"),
         daysRemaining    = _license.DaysRemaining,
         authorizedUsers  = _users.UserCount,

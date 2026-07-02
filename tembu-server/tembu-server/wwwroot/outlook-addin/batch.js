@@ -25,6 +25,8 @@ const SKIP_LOCAL = [
 ];
 
 let _token     = '';
+let _serverUrl = '';
+let _userEmail = '';
 let _cancelled = false;
 let _running   = false;
 let _ownEmail  = '';
@@ -34,47 +36,16 @@ let _folders   = []; // [{id, displayName, totalItemCount, checked}]
 window.addEventListener('DOMContentLoaded', async () => {
   TI18n.applyStaticI18n();
   const p = new URLSearchParams(window.location.search);
-  _token = p.get('t') || '';
+  _token     = p.get('t')   || '';
+  _serverUrl = (p.get('srv') || '').trim().replace(/\/+$/, '');
+  _userEmail = p.get('ue')  || '';
   if (!_token) {
     document.getElementById('folderList').innerHTML =
       `<span class="folder-loading" style="color:#c00">${escHtml(TI18n.t('batch.noTokenError'))}</span>`;
     return;
   }
-  loadAIConfig();
   await loadFolders();
 });
-
-// ── AI settings UI ────────────────────────────────────────────────────────────
-const LOCAL_PROVIDERS = new Set(['ollama', 'lmstudio']);
-
-function loadAIConfig() {
-  const provider  = localStorage.getItem('tembu_provider')  || 'ollama';
-  const apiKey    = localStorage.getItem('tembu_apikey')    || '';
-  const endpoint  = localStorage.getItem('tembu_endpoint')  || 'http://localhost:11434';
-  const model     = localStorage.getItem('tembu_model')     || 'qwen2.5:14b';
-  document.getElementById('providerSelect').value  = provider;
-  document.getElementById('apiKeyInput').value     = apiKey;
-  document.getElementById('localEndpoint').value   = endpoint;
-  document.getElementById('localModel').value      = model;
-  onProviderChange();
-}
-
-function saveAIConfig() {
-  const provider = document.getElementById('providerSelect').value;
-  localStorage.setItem('tembu_provider',  provider);
-  localStorage.setItem('tembu_apikey',    document.getElementById('apiKeyInput').value.trim());
-  localStorage.setItem('tembu_endpoint',  document.getElementById('localEndpoint').value.trim());
-  localStorage.setItem('tembu_model',     document.getElementById('localModel').value.trim());
-  document.getElementById('actionHint').textContent = TI18n.t('batch.aiConfigSaved');
-  setTimeout(() => updateStartButton(), 1500);
-}
-
-function onProviderChange() {
-  const isLocal = LOCAL_PROVIDERS.has(document.getElementById('providerSelect').value);
-  document.getElementById('apiKeyInput').classList.toggle('hidden', isLocal);
-  document.getElementById('localEndpoint').classList.toggle('hidden', !isLocal);
-  document.getElementById('localModel').classList.toggle('hidden', !isLocal);
-}
 
 // ── Load and render folder list ───────────────────────────────────────────────
 async function loadFolders() {
@@ -292,53 +263,15 @@ async function fetchContactMeetings(email, since) {
   } catch { return []; }
 }
 
-// ── AI prompt (same structure as detail.js) ───────────────────────────────────
-function buildContactPrompt(name, email, data) {
-  const { emails, meetings } = data;
-  const today  = TI18n.formatDate(new Date());
-  const eLines = emails.slice(0, 60).map(e =>
-    `[${e.date}] EMAIL ${e.direction === 'received' ? 'VON' : 'AN'}: "${e.subject}" – ${e.preview}`
-  ).join('\n');
-  const mLines = meetings.slice(0, 20).map(m =>
-    `[${m.date}] MEETING (${m.duration}min): "${m.subject}"`
-  ).join('\n');
-
-  return `Du bist ein persönlicher Business-Assistent. Heute ist ${today}. ${TCore.aiLanguageInstruction()}
-Analysiere alle Interaktionen mit "${name}" (${email}).
-
-${eLines ? `E-MAILS:\n${eLines}\n\n` : ''}${mLines ? `MEETINGS:\n${mLines}\n\n` : ''}${(!eLines && !mLines) ? 'Noch keine Interaktionen.\n\n' : ''}Antworte NUR mit validem JSON (kein Markdown).
-Wichtig: Im "interactions"-Array jedes Themas ALLE zugehörigen Interaktionen auflisten, keine Auswahl.
-{
-  "summary": "2-3 Sätze zur Beziehung, Häufigkeit, Ton",
-  "sentiment": "${TCore.aiJsonSchemaEnums().sentiment}",
-  "openPoints": ["Offener Punkt 1"],
-  "themes": [
-    { "name": "Thema", "status": "${TCore.aiJsonSchemaEnums().status}", "summary": "Kurzbeschreibung", "interactions": [{"date":"YYYY-MM-DD","type":"email|meeting","subject":"Betreff"}] }
-  ],
-  "nextStep": "Konkrete Empfehlung für nächstes Gespräch",
-  "background": "Öffentlich bekannte Infos zu ${name}: Beruf, Unternehmen, Branche. Falls unbekannt: leer lassen."
-}`;
-}
-
-// ── AI config ─────────────────────────────────────────────────────────────────
-function getAIConfig() {
-  return {
-    provider: localStorage.getItem('tembu_provider')  || 'ollama',
-    apiKey:   localStorage.getItem('tembu_apikey')    || '',
-    endpoint: localStorage.getItem('tembu_endpoint')  || 'http://localhost:11434',
-    model:    localStorage.getItem('tembu_model')     || 'qwen2.5:14b',
-  };
-}
-
-function isLocalProvider(p) { return LOCAL_PROVIDERS.has(p); }
-
+// ── AI ────────────────────────────────────────────────────────────────────────
+// Läuft server-seitig über tembu-server /api/analyze (gleicher Endpoint wie detail.js).
 function isRecent(savedAt) {
   if (!savedAt) return false;
   return Date.now() - new Date(savedAt).getTime() < 24 * 60 * 60 * 1000;
 }
 
 // ── Analyse one contact ───────────────────────────────────────────────────────
-async function analyzeContact(email, name, since, config) {
+async function analyzeContact(email, name, since) {
   const existing = await TCore.loadAnalysis(_token, email);
   if (existing && isRecent(existing.savedAt)) return { skipped: true };
 
@@ -347,7 +280,21 @@ async function analyzeContact(email, name, since, config) {
     fetchContactMeetings(email, since),
   ]);
 
-  const raw      = await TCore.callAI(buildContactPrompt(name, email, { emails, meetings }), config);
+  const res = await fetch(`${_serverUrl}/api/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userEmail: _userEmail, contactName: name, contactEmail: email,
+      emails:   emails.map(e   => ({ dateStr: e.date, direction: e.direction, subject: e.subject, preview: e.preview })),
+      meetings: meetings.map(m => ({ dateStr: m.date, subject: m.subject, durationMin: m.duration })),
+      rumbles:  [],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${body.slice(0, 150)}`);
+  }
+  const raw      = await res.text();
   const analysis = TCore.parseAIResponse(raw);
   await TCore.saveAnalysis(_token, email, name, email, analysis);
 
@@ -384,9 +331,8 @@ async function startBatch() {
   _running   = true;
   _cancelled = false;
 
-  const config = getAIConfig();
-  if (!isLocalProvider(config.provider) && !config.apiKey) {
-    alert(TI18n.t('batch.needProviderAlert'));
+  if (!_serverUrl) {
+    alert(TI18n.t('batch.needServerAlert'));
     _running = false;
     return;
   }
@@ -431,7 +377,7 @@ async function startBatch() {
       document.getElementById('progressCurrent').textContent = TI18n.t('batch.analyzingContact', { name });
 
       try {
-        const result = await analyzeContact(email, name, since, config);
+        const result = await analyzeContact(email, name, since);
         if (result.skipped) {
           skipped++; setStat('statSkip', skipped);
           addLogItem(name, email, '⏭', 'skip', TI18n.t('batch.skippedRecent'));

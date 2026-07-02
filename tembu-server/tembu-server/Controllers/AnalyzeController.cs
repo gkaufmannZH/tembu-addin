@@ -34,4 +34,22 @@ public class AnalyzeController : ControllerBase
             return StatusCode(500, ex.Message);
         }
     }
+
+    [HttpPost("company")]
+    public async Task<IActionResult> AnalyzeCompany([FromBody] CompanyData data)
+    {
+        if (!_users.IsAuthorized(data.UserEmail))
+            return StatusCode(403, $"Nutzer '{data.UserEmail}' ist nicht lizenziert.");
+
+        try
+        {
+            var prompt = PromptBuilder.BuildCompany(data);
+            var result = await _ai.CallAsync(prompt);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
 }

@@ -896,7 +896,7 @@ function openDetailDialog() {
 function openCompanyDialog() {
   const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
   if (!domain) { showStatus(TI18n.t('taskpane.noCompanyDomain'), 'error'); return; }
-  const params = new URLSearchParams({ domain, t: _token || '', _v: '20260701a' });
+  const params = new URLSearchParams({ domain, t: _token || '', srv: getServerUrl(), ue: _account?.username || '', _v: '20260701a' });
   const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/company.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
@@ -908,7 +908,7 @@ function openCompanyDialog() {
 }
 
 function openBatchDialog() {
-  const params = new URLSearchParams({ t: _token || '', _v: '20260701a' });
+  const params = new URLSearchParams({ t: _token || '', srv: getServerUrl(), ue: _account?.username || '', _v: '20260701a' });
   const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/batch.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {

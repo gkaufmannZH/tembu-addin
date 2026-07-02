@@ -47,4 +47,47 @@ public static class PromptBuilder
             "Wichtig: Im interactions-Array jedes Themas ALLE zugehoerigen Interaktionen auflisten.\n" +
             jsonTemplate;
     }
+
+    public static string BuildCompany(CompanyData data)
+    {
+        var today = DateTime.Now.ToString("dd.MM.yyyy");
+        var contactNames = data.Contacts.Count > 0
+            ? string.Join(", ", data.Contacts.Select(c => c.Name).Where(n => n.Length > 0))
+            : "unbekannte Kontakte";
+
+        var eLines = string.Join("\n", data.Emails.Take(80).Select(e =>
+        {
+            var dir = e.Direction == "received" ? "VON" : "AN";
+            return "[" + e.DateStr + "] EMAIL " + dir + " " + e.Contact + ": \"" + e.Subject + "\"";
+        }));
+
+        var mLines = string.Join("\n", data.Meetings.Take(40).Select(m =>
+            "[" + m.DateStr + "] MEETING mit " + m.Contact + " (" + m.DurationMin + "min): \"" + m.Subject + "\""));
+
+        var blocks = "";
+        if (eLines.Length > 0) blocks += "E-MAILS:\n" + eLines + "\n\n";
+        if (mLines.Length > 0) blocks += "MEETINGS:\n" + mLines + "\n\n";
+        if (blocks.Length == 0) blocks = "Noch keine Interaktionen gefunden.\n\n";
+
+        var jsonTemplate =
+            "{\n" +
+            "  \"summary\": \"2-3 Saetze zur Gesamtbeziehung mit der Firma\",\n" +
+            "  \"sentiment\": \"positiv|neutral|negativ\",\n" +
+            "  \"openPoints\": [\"Offener Punkt 1\"],\n" +
+            "  \"themes\": [\n" +
+            "    { \"name\": \"Thema\", \"status\": \"offen|abgeschlossen\", \"summary\": \"Kurzbeschreibung\", \"contacts\": [\"Name1\",\"Name2\"],\n" +
+            "      \"interactions\": [{\"date\":\"YYYY-MM-DD\",\"type\":\"email|meeting\",\"contact\":\"Name\",\"subject\":\"Betreff\"}] }\n" +
+            "  ],\n" +
+            "  \"nextStep\": \"Konkrete Empfehlung fuer naechsten Schritt mit dieser Firma\"\n" +
+            "}";
+
+        return
+            "Du bist ein Business-Assistent. Heute ist " + today + ".\n" +
+            "Analysiere meine Geschaeftsbeziehung mit der Firma \"" + data.CompanyName + "\" (Domain: " + data.Domain + ").\n" +
+            "Bekannte Kontakte: " + contactNames + ".\n\n" +
+            blocks +
+            "Antworte NUR mit validem JSON (kein Markdown).\n" +
+            "Wichtig: Im interactions-Array ALLE zugehoerigen Interaktionen auflisten, keine Auswahl.\n" +
+            jsonTemplate;
+    }
 }

@@ -9,18 +9,16 @@ const PERSONAL_DOMAINS = new Set([
 
 const SESSION_KEY       = '@tembu_outlook_session';
 const DIALOG_TK_KEY     = '@tembu_dialog_token';
-const SETTINGS_KEY      = '@tembu_detail_settings';
 const DB_NAME           = 'tembu_cache_v1';
 const STORE_NAME        = 'contact_analyses';
 const SINCE_MONTHS_KEY  = 'tembu_since_months';
 const HISTORY_MONTHS_KEY = 'tembu_history_months';
-const AI_PROVIDER_KEY   = 'tembu_ai_provider';
-const AI_MODEL_KEY      = 'tembu_ai_model';
-const AI_ENDPOINT_KEY   = 'tembu_ai_endpoint';
 
 const esc = TCore.esc;
 
 let _token       = null;
+let _serverUrl   = '';
+let _userEmail   = '';
 let _domain      = '';
 let _companyName = '';
 let _cacheKey    = '';
@@ -32,40 +30,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const params = new URLSearchParams(window.location.search);
   _domain      = (params.get('domain') || '').toLowerCase().trim();
   _companyName = params.get('company') || deriveCompanyName(_domain);
+  _serverUrl   = (params.get('srv') || '').trim().replace(/\/+$/, '');
+  _userEmail   = params.get('ue')   || '';
   _cacheKey    = 'company:' + _domain;
 
   document.getElementById('headerName').textContent   = _companyName;
   document.getElementById('headerDomain').textContent = _domain;
-
-  const settings = loadSettings();
-  if (settings.apiKey) document.getElementById('apiKeyInput').value = settings.apiKey;
-  const aiConfig = getAIConfig();
-  const providerSelect = document.getElementById('providerSelect');
-  providerSelect.value = aiConfig.provider;
-  if (aiConfig.endpoint) document.getElementById('localEndpoint').value = aiConfig.endpoint;
-  if (aiConfig.model)    document.getElementById('localModel').value    = aiConfig.model;
-  updateProviderUI(aiConfig.provider);
-  if (isLocalProvider(aiConfig.provider)) loadOllamaModels();
-  providerSelect.addEventListener('change', () => {
-    const p = providerSelect.value;
-    localStorage.setItem(AI_PROVIDER_KEY, p);
-    updateProviderUI(p);
-    if (isLocalProvider(p)) loadOllamaModels();
-  });
-
-  document.getElementById('btnSaveKey').addEventListener('click', () => {
-    const key = document.getElementById('apiKeyInput').value.trim();
-    saveSettings({ apiKey: key });
-    if (_rawData) runAI(_rawData);
-  });
-  document.getElementById('btnSaveLocal').addEventListener('click', () => {
-    const endpoint = document.getElementById('localEndpoint').value.trim();
-    const model    = document.getElementById('localModel').value.trim();
-    if (endpoint) localStorage.setItem(AI_ENDPOINT_KEY, endpoint);
-    if (model)    localStorage.setItem(AI_MODEL_KEY,    model);
-    loadOllamaModels();
-    if (_rawData) runAI(_rawData);
-  });
 
   const sinceSelect = document.getElementById('sinceSelect');
   sinceSelect.value = localStorage.getItem(SINCE_MONTHS_KEY) || '24';
@@ -89,45 +59,12 @@ function deriveCompanyName(domain) {
   return part.charAt(0).toUpperCase() + part.slice(1);
 }
 
-// ── Token / Settings ──────────────────────────────────────────────────────
+// ── Token ─────────────────────────────────────────────────────────────────
 function getStoredToken() {
   try { const t = new URLSearchParams(window.location.search).get('t'); if (t?.length > 10) return t; } catch {}
   try { const r = localStorage.getItem(DIALOG_TK_KEY); if (r) { const d = JSON.parse(r); if (d.exp > Date.now()) return d.token; } } catch {}
   try { const r = localStorage.getItem(SESSION_KEY);   if (r) { const d = JSON.parse(r); if (d.expiry > Date.now()) return d.token; } } catch {}
   return null;
-}
-function loadSettings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch { return {}; } }
-function saveSettings(patch) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...loadSettings(), ...patch })); } catch {} }
-function getAIConfig() {
-  const s = loadSettings();
-  const provider = localStorage.getItem(AI_PROVIDER_KEY) || 'gemini';
-  return { provider, apiKey: s.apiKey || '', model: localStorage.getItem(AI_MODEL_KEY) || '', endpoint: localStorage.getItem(AI_ENDPOINT_KEY) || '' };
-}
-function isLocalProvider(p) { return p === 'ollama' || p === 'lmstudio'; }
-
-function updateProviderUI(provider) {
-  const isLocal = isLocalProvider(provider);
-  document.getElementById('apiKeyInput').classList.toggle('hidden', isLocal);
-  document.getElementById('btnSaveKey').classList.toggle('hidden', isLocal);
-  document.getElementById('geminiLink').classList.toggle('hidden', isLocal || provider !== 'gemini');
-  document.getElementById('localEndpoint').classList.toggle('hidden', !isLocal);
-  document.getElementById('localModel').classList.toggle('hidden', !isLocal);
-  document.getElementById('btnSaveLocal').classList.toggle('hidden', !isLocal);
-  const endpointEl = document.getElementById('localEndpoint');
-  if (isLocal && !endpointEl.value)
-    endpointEl.value = provider === 'lmstudio' ? 'http://localhost:1234' : 'http://localhost:11434';
-  const noKeyBtn = document.getElementById('noKeyBtn');
-  if (noKeyBtn) noKeyBtn.classList.toggle('hidden', isLocal);
-}
-
-async function loadOllamaModels() {
-  const endpoint = document.getElementById('localEndpoint')?.value.trim() || localStorage.getItem(AI_ENDPOINT_KEY) || 'http://localhost:11434';
-  try {
-    const res  = await fetch(`${endpoint}/api/tags`);
-    const data = await res.json();
-    const list = document.getElementById('modelList');
-    if (list && data.models?.length) list.innerHTML = data.models.map(m => `<option value="${m.name}">`).join('');
-  } catch {}
 }
 
 // ── Since helpers ─────────────────────────────────────────────────────────
@@ -320,16 +257,35 @@ async function fetchMeetingsForContacts(contacts, since, topPerContact = 50) {
 }
 
 // ── AI ────────────────────────────────────────────────────────────────────
+// Läuft server-seitig über tembu-server /api/analyze/company.
+function toCompanyData(data) {
+  return {
+    userEmail:   _userEmail,
+    companyName: _companyName,
+    domain:      _domain,
+    contacts: data.contacts.map(c => ({ name: c.name, email: c.email })),
+    emails:   data.emails.map(e   => ({ dateStr: e.date, direction: e.direction, contact: e.contact, subject: e.subject })),
+    meetings: data.meetings.map(m => ({ dateStr: m.date, contact: m.contact, subject: m.subject, durationMin: m.duration })),
+  };
+}
+
 async function runAI(data) {
-  const config = getAIConfig();
-  const hasKey = isLocalProvider(config.provider) || !!config.apiKey;
-  if (!hasKey) { document.getElementById('noKeyBox').classList.remove('hidden'); return; }
+  if (!_serverUrl) { document.getElementById('noKeyBox').classList.remove('hidden'); return; }
 
   const themesEl = document.getElementById('themesContent');
   themesEl.innerHTML = `<div class="loading-box">${esc(TI18n.t('common.aiAnalyzing'))}</div>`;
 
   try {
-    const raw    = await TCore.callAI(buildPrompt(data), config);
+    const res = await fetch(`${_serverUrl}/api/analyze/company`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toCompanyData(data)),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`${res.status} ${body.slice(0, 150)}`);
+    }
+    const raw    = await res.text();
     const parsed = TCore.parseAIResponse(raw);
     renderAiAnalysis(parsed);
     renderThemes(parsed.themes || []);
@@ -341,51 +297,10 @@ async function runAI(data) {
     const errMsg = String(e.message || e);
     const noKeyBox = document.getElementById('noKeyBox');
     const desc     = document.getElementById('noKeyDesc');
-    const icon     = document.querySelector('#noKeyBox .no-key-icon');
-    const title    = document.querySelector('#noKeyBox .no-key-title');
-    if (isLocalProvider(config.provider)) {
-      if (icon)  icon.textContent  = '⚠️';
-      if (title) title.textContent = TI18n.t('common.aiConnectionErrorTitle');
-      const isFetch = errMsg.toLowerCase().includes('fetch');
-      if (desc) desc.innerHTML = TI18n.t('common.errorPrefix', { msg: esc(errMsg) })
-        + (isFetch ? '<br/><br/>' + TI18n.t('common.aiErrorCorsShort') : '');
-    } else {
-      if (icon)  icon.textContent  = '🔑';
-      if (title) title.textContent = TI18n.t('common.aiAvailableTitle');
-      if (desc)  desc.innerHTML    = TI18n.t('common.errorPrefix', { msg: esc(errMsg) });
-    }
+    if (desc) desc.innerHTML = TI18n.t('company.noKeyDesc') + '<br/><br/>' + TI18n.t('common.errorPrefix', { msg: esc(errMsg) });
     if (noKeyBox) noKeyBox.classList.remove('hidden');
     themesEl.innerHTML = `<div class="empty-state">${esc(TI18n.t('common.analysisFailed'))}</div>`;
   }
-}
-
-function buildPrompt(data) {
-  const { emails, meetings, contacts } = data;
-  const today        = TI18n.formatDate(new Date());
-  const contactNames = contacts.length ? contacts.map(c => c.name).filter(Boolean).join(', ') : 'unbekannte Kontakte';
-
-  const eLines = emails.slice(0, 80).map(e =>
-    `[${e.date}] EMAIL ${e.direction === 'received' ? 'VON' : 'AN'} ${e.contact}: "${e.subject}"`
-  ).join('\n');
-  const mLines = meetings.slice(0, 40).map(m =>
-    `[${m.date}] MEETING mit ${m.contact} (${m.duration}min): "${m.subject}"`
-  ).join('\n');
-
-  return `Du bist ein Business-Assistent. Heute ist ${today}. ${TCore.aiLanguageInstruction()}
-Analysiere meine Geschäftsbeziehung mit der Firma "${_companyName}" (Domain: ${_domain}).
-Bekannte Kontakte: ${contactNames}.
-
-${eLines ? `E-MAILS:\n${eLines}\n\n` : ''}${mLines ? `MEETINGS:\n${mLines}\n\n` : ''}${(!eLines && !mLines) ? 'Noch keine Interaktionen gefunden.\n\n' : ''}Antworte NUR mit validem JSON (kein Markdown).
-Wichtig: Im "interactions"-Array ALLE zugehörigen Interaktionen auflisten, keine Auswahl.
-{
-  "summary": "2-3 Sätze zur Gesamtbeziehung mit der Firma",
-  "sentiment": "${TCore.aiJsonSchemaEnums().sentiment}",
-  "openPoints": ["Offener Punkt 1"],
-  "themes": [
-    { "name": "Thema", "status": "${TCore.aiJsonSchemaEnums().status}", "summary": "Kurzbeschreibung", "contacts": ["Name1","Name2"], "interactions": [{"date":"YYYY-MM-DD","type":"email|meeting","contact":"Name","subject":"Betreff"}] }
-  ],
-  "nextStep": "Konkrete Empfehlung für nächsten Schritt mit dieser Firma"
-}`;
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────

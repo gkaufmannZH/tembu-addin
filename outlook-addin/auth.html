@@ -5,8 +5,7 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="lib/msal-browser.min.js"></script>
 </head>
-<body style="font-family:sans-serif;font-size:13px;padding:10px;color:#333">
-<div id="log"></div>
+<body>
 <script>
 /* globals Office, msal */
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
@@ -15,19 +14,6 @@ const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 // exakten URLs müssen in der Azure-AD-App-Registrierung als SPA-Redirect-URI eingetragen sein.
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read', 'Files.ReadWrite'];
-
-// Sichtbares Log direkt im Fenster, damit man ohne DevTools sieht, wo es hängt.
-function log(msg) {
-  console.log('[tembu-auth]', msg);
-  const el = document.getElementById('log');
-  if (el) el.innerHTML += '<div>' + msg + '</div>';
-}
-
-window.onerror = function (message, source, lineno, colno, error) {
-  log('window.onerror: ' + message + ' @' + source + ':' + lineno + (error?.stack ? '<br><pre>' + error.stack + '</pre>' : ''));
-};
-
-log('Skript gestartet. typeof Office=' + typeof Office + ' typeof msal=' + typeof msal);
 
 const msalInstance = new msal.PublicClientApplication({
   auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
@@ -39,13 +25,11 @@ const msalInstance = new msal.PublicClientApplication({
 // Verlust der Nachricht, kein Fehler) – deshalb bei Bedarf in Chunks senden.
 function sendToParent(payloadObj) {
   const msg = JSON.stringify(payloadObj);
-  log('Sende an Taskpane (' + msg.length + ' Zeichen)…');
   const MAX = 4000;
   if (msg.length <= MAX) {
     Office.context.ui.messageParent(msg);
     return;
   }
-  log('Nachricht > ' + MAX + ' Zeichen – sende in ' + Math.ceil(msg.length / MAX) + ' Chunks.');
   const parts = [];
   for (let i = 0; i < msg.length; i += MAX) parts.push(msg.slice(i, i + MAX));
   let i = 0;
@@ -57,7 +41,6 @@ function sendToParent(payloadObj) {
 }
 
 function sendSuccess(result) {
-  log('Erfolg – sende Token an Taskpane…');
   sendToParent({
     success: true,
     token: result.accessToken,
@@ -65,49 +48,29 @@ function sendSuccess(result) {
   });
 }
 
-setTimeout(() => {
-  if (!window.__tembuOfficeInitFired) log('WARNUNG: Office.initialize wurde nach 5s nicht aufgerufen – office.js hat evtl. nicht geladen.');
-}, 5000);
-
 // loginPopup statt loginRedirect: das Office-Dialogfenster navigiert dabei nie weg,
 // sondern öffnet nur ein zusätzliches Popup für login.microsoftonline.com. So bleibt
-// der Office.js-Host-Kontext (inkl. _host_Info in der URL) erhalten – bei loginRedirect
-// ging er beim Zurücknavigieren verloren und messageParent() erreichte die Taskpane
-// danach nicht mehr (kein Fehler, einfach kein Effekt = "hängt nach Kontoauswahl").
+// der Office.js-Host-Kontext erhalten.
 Office.initialize = async function () {
-  window.__tembuOfficeInitFired = true;
-  log('Office.initialize gestartet.');
   try {
-    if (msalInstance.initialize) {
-      await msalInstance.initialize();
-      log('msalInstance.initialize() ok.');
-    }
+    if (msalInstance.initialize) await msalInstance.initialize();
 
     const accounts = msalInstance.getAllAccounts();
-    log('Bekannte Accounts im Cache: ' + accounts.length);
     if (accounts.length > 0) {
       try {
-        log('Versuche acquireTokenSilent…');
         const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
-        log('acquireTokenSilent erfolgreich.');
         sendSuccess(result);
         return;
-      } catch (silentErr) {
-        log('acquireTokenSilent fehlgeschlagen: ' + silentErr.message + ' – starte loginPopup.');
-      }
+      } catch {}
     }
 
-    log('Starte loginPopup…');
     const result = await msalInstance.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
-    log('loginPopup zurückgekehrt, Token erhalten.');
     sendSuccess(result);
   } catch (e) {
-    log('FEHLER: ' + (e.errorCode || '') + ' ' + e.message + (e.stack ? '<br><pre>' + e.stack + '</pre>' : ''));
+    console.error('[tembu-auth]', e);
     try {
       sendToParent({ success: false, error: e.message });
-    } catch (msgErr) {
-      log('messageParent selbst ist fehlgeschlagen: ' + msgErr.message);
-    }
+    } catch {}
   }
 };
 </script>

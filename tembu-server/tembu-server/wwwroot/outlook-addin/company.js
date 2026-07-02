@@ -370,7 +370,7 @@ function renderContacts(data) {
   const list = Object.values(byEmail).sort((a,b) => b.count - a.count);
   if (!list.length) { el.innerHTML = `<div class="empty-state">${esc(TI18n.t('company.noContactsFound'))}</div>`; return; }
 
-  const detailBase = `detail.html?t=${encodeURIComponent(_token || '')}`;
+  const detailBase = `detail-open.html?t=${encodeURIComponent(_token || '')}&srv=${encodeURIComponent(_serverUrl)}&ue=${encodeURIComponent(_userEmail)}`;
   el.innerHTML = list.map(c => {
     const initials = (c.name || c.email).split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const link = `${detailBase}&name=${encodeURIComponent(c.name || '')}&email=${encodeURIComponent(c.email)}`;

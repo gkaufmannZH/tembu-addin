@@ -5,12 +5,26 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="lib/msal-browser.min.js"></script>
 </head>
-<body>
+<body style="font-family:sans-serif;font-size:13px;padding:10px;color:#333">
+<div id="log"></div>
 <script>
 /* globals Office, msal */
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
 const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu-addin/outlook-addin/auth.html';
 const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read', 'Files.ReadWrite'];
+
+// Sichtbares Log direkt im Fenster, damit man ohne DevTools sieht, wo es hängt.
+function log(msg) {
+  console.log('[tembu-auth]', msg);
+  const el = document.getElementById('log');
+  if (el) el.innerHTML += '<div>' + msg + '</div>';
+}
+
+window.onerror = function (message, source, lineno, colno, error) {
+  log('window.onerror: ' + message + ' @' + source + ':' + lineno + (error?.stack ? '<br><pre>' + error.stack + '</pre>' : ''));
+};
+
+log('Skript gestartet. typeof Office=' + typeof Office + ' typeof msal=' + typeof msal);
 
 const msalInstance = new msal.PublicClientApplication({
   auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
@@ -18,6 +32,7 @@ const msalInstance = new msal.PublicClientApplication({
 });
 
 function sendSuccess(result) {
+  log('Erfolg – sende Token an Taskpane…');
   Office.context.ui.messageParent(JSON.stringify({
     success: true,
     token: result.accessToken,
@@ -25,28 +40,49 @@ function sendSuccess(result) {
   }));
 }
 
+setTimeout(() => {
+  if (!window.__tembuOfficeInitFired) log('WARNUNG: Office.initialize wurde nach 5s nicht aufgerufen – office.js hat evtl. nicht geladen.');
+}, 5000);
+
 // loginPopup statt loginRedirect: das Office-Dialogfenster navigiert dabei nie weg,
 // sondern öffnet nur ein zusätzliches Popup für login.microsoftonline.com. So bleibt
 // der Office.js-Host-Kontext (inkl. _host_Info in der URL) erhalten – bei loginRedirect
 // ging er beim Zurücknavigieren verloren und messageParent() erreichte die Taskpane
 // danach nicht mehr (kein Fehler, einfach kein Effekt = "hängt nach Kontoauswahl").
 Office.initialize = async function () {
+  window.__tembuOfficeInitFired = true;
+  log('Office.initialize gestartet.');
   try {
-    if (msalInstance.initialize) await msalInstance.initialize();
-
-    const accounts = msalInstance.getAllAccounts();
-    if (accounts.length > 0) {
-      try {
-        const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
-        sendSuccess(result);
-        return;
-      } catch {}
+    if (msalInstance.initialize) {
+      await msalInstance.initialize();
+      log('msalInstance.initialize() ok.');
     }
 
+    const accounts = msalInstance.getAllAccounts();
+    log('Bekannte Accounts im Cache: ' + accounts.length);
+    if (accounts.length > 0) {
+      try {
+        log('Versuche acquireTokenSilent…');
+        const result = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
+        log('acquireTokenSilent erfolgreich.');
+        sendSuccess(result);
+        return;
+      } catch (silentErr) {
+        log('acquireTokenSilent fehlgeschlagen: ' + silentErr.message + ' – starte loginPopup.');
+      }
+    }
+
+    log('Starte loginPopup…');
     const result = await msalInstance.loginPopup({ scopes: SCOPES, prompt: 'select_account' });
+    log('loginPopup zurückgekehrt, Token erhalten.');
     sendSuccess(result);
   } catch (e) {
-    Office.context.ui.messageParent(JSON.stringify({ success: false, error: e.message }));
+    log('FEHLER: ' + (e.errorCode || '') + ' ' + e.message + (e.stack ? '<br><pre>' + e.stack + '</pre>' : ''));
+    try {
+      Office.context.ui.messageParent(JSON.stringify({ success: false, error: e.message }));
+    } catch (msgErr) {
+      log('messageParent selbst ist fehlgeschlagen: ' + msgErr.message);
+    }
   }
 };
 </script>

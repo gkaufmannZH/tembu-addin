@@ -31,13 +31,35 @@ const msalInstance = new msal.PublicClientApplication({
   cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true },
 });
 
+// Office-Dialoge haben ein Limit von ~5000 Zeichen pro messageParent()-Aufruf.
+// Access-Tokens mit vielen Scopes/Gruppenclaims überschreiten das leicht (lautloser
+// Verlust der Nachricht, kein Fehler) – deshalb bei Bedarf in Chunks senden.
+function sendToParent(payloadObj) {
+  const msg = JSON.stringify(payloadObj);
+  log('Sende an Taskpane (' + msg.length + ' Zeichen)…');
+  const MAX = 4000;
+  if (msg.length <= MAX) {
+    Office.context.ui.messageParent(msg);
+    return;
+  }
+  log('Nachricht > ' + MAX + ' Zeichen – sende in ' + Math.ceil(msg.length / MAX) + ' Chunks.');
+  const parts = [];
+  for (let i = 0; i < msg.length; i += MAX) parts.push(msg.slice(i, i + MAX));
+  let i = 0;
+  (function next() {
+    Office.context.ui.messageParent(JSON.stringify({ __tembuChunk: true, i, n: parts.length, data: parts[i] }));
+    i++;
+    if (i < parts.length) setTimeout(next, 30);
+  })();
+}
+
 function sendSuccess(result) {
   log('Erfolg – sende Token an Taskpane…');
-  Office.context.ui.messageParent(JSON.stringify({
+  sendToParent({
     success: true,
     token: result.accessToken,
     account: { name: result.account.name, username: result.account.username },
-  }));
+  });
 }
 
 setTimeout(() => {
@@ -79,7 +101,7 @@ Office.initialize = async function () {
   } catch (e) {
     log('FEHLER: ' + (e.errorCode || '') + ' ' + e.message + (e.stack ? '<br><pre>' + e.stack + '</pre>' : ''));
     try {
-      Office.context.ui.messageParent(JSON.stringify({ success: false, error: e.message }));
+      sendToParent({ success: false, error: e.message });
     } catch (msgErr) {
       log('messageParent selbst ist fehlgeschlagen: ' + msgErr.message);
     }

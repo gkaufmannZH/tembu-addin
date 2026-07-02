@@ -29,7 +29,16 @@ const msalInstance = new msal.PublicClientApplication({
 });
 
 // ── Office init ───────────────────────────────────────────────────────────
+function onLangChange(lang) {
+  TI18n.setLang(lang);
+  location.reload();
+}
+
 Office.initialize = async function () {
+  TI18n.applyStaticI18n();
+  const langSelect = document.getElementById('langSelect');
+  if (langSelect) langSelect.value = TI18n.getLang();
+
   await msalInstance.initialize();
   await msalInstance.handleRedirectPromise();
 
@@ -144,7 +153,7 @@ function loadOutlookContext() {
   }
 
   if (item.itemType === Office.MailboxEnums.ItemType.Message) {
-    if (typeEl) typeEl.textContent = 'E-Mail';
+    if (typeEl) typeEl.textContent = TI18n.t('taskpane.sourceTypeEmail');
     badge?.classList.remove('hidden');
     if (subjectEl) setSubject(subjectEl);
     _messageParticipantNames = [];
@@ -196,7 +205,7 @@ function loadOutlookContext() {
     } catch {}
 
   } else if (item.itemType === Office.MailboxEnums.ItemType.Appointment) {
-    if (typeEl) typeEl.textContent = 'Termin';
+    if (typeEl) typeEl.textContent = TI18n.t('taskpane.sourceTypeAppointment');
     badge?.classList.remove('hidden');
     if (subjectEl) setSubject(subjectEl);
     _appointmentAttendeeNames = [];
@@ -330,14 +339,14 @@ function renderContactDropdown(filter) {
   if (!dropdown) return;
   const q = (filter || '').toLowerCase().trim();
   if (!_contactDirectory.length) {
-    dropdown.innerHTML = '<div class="rumble-empty" style="padding:10px">Kontakte werden geladen…</div>';
+    dropdown.innerHTML = `<div class="rumble-empty" style="padding:10px">${escapeTp(TI18n.t('taskpane.contactsLoading'))}</div>`;
     return;
   }
   const matches = q
     ? _contactDirectory.filter(c => c.name.toLowerCase().includes(q))
     : _contactDirectory;
   if (!matches.length) {
-    dropdown.innerHTML = '<div class="rumble-empty" style="padding:10px">Keine Treffer.</div>';
+    dropdown.innerHTML = `<div class="rumble-empty" style="padding:10px">${escapeTp(TI18n.t('taskpane.noMatches'))}</div>`;
     return;
   }
   dropdown.innerHTML = matches.map(c =>
@@ -390,14 +399,28 @@ function startSignIn() {
     { height: 60, width: 35, promptBeforeOpen: false },
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-        showStatus('Dialog-Fehler: ' + (asyncResult.error?.message || asyncResult.error?.code || 'unbekannt'), 'error');
+        showStatus(TI18n.t('taskpane.dialogError', { msg: asyncResult.error?.message || asyncResult.error?.code || TI18n.t('taskpane.unknownError') }), 'error');
         return;
       }
       const dialog = asyncResult.value;
+      let _chunkBuffer = null;
       dialog.addEventHandler(Office.EventType.DialogMessageReceived, (args) => {
+        // Lange Access-Tokens überschreiten das ~5000-Zeichen-Limit von messageParent()
+        // und werden von auth.html in Chunks gesendet – hier wieder zusammensetzen.
+        let raw = args.message;
+        try {
+          const parsed = JSON.parse(args.message);
+          if (parsed && parsed.__tembuChunk) {
+            if (!_chunkBuffer) _chunkBuffer = new Array(parsed.n);
+            _chunkBuffer[parsed.i] = parsed.data;
+            if (_chunkBuffer.some(c => c === undefined)) return; // auf weitere Chunks warten
+            raw = _chunkBuffer.join('');
+            _chunkBuffer = null;
+          }
+        } catch {}
         dialog.close();
         try {
-          const msg = JSON.parse(args.message);
+          const msg = JSON.parse(raw);
           if (msg.success && msg.token) {
             _token = msg.token;
             _account = msg.account;
@@ -413,10 +436,10 @@ function startSignIn() {
             clearStatus();
             loadContactsFromGraph();
           } else {
-            showStatus(msg.error || 'Anmeldung fehlgeschlagen.', 'error');
+            showStatus(msg.error || TI18n.t('taskpane.signInFailed'), 'error');
           }
         } catch {
-          showStatus('Unbekannter Fehler.', 'error');
+          showStatus(TI18n.t('taskpane.unknownError'), 'error');
         }
       });
       dialog.addEventHandler(Office.EventType.DialogEventReceived, () => dialog.close());
@@ -538,7 +561,7 @@ async function loadMeetingBriefing() {
         if (matches.length > 0) {
           nm.addAsync('tembu-badge', {
             type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-            message: `Tembu: ${matches.length} Rumble${matches.length !== 1 ? 's' : ''} für dieses Meeting`,
+            message: TI18n.tn('taskpane.meetingBriefingCount', matches.length),
             icon: 'Icon.16',
             persistent: false,
           });
@@ -586,12 +609,12 @@ async function handleSave() {
   const contactPhone = document.getElementById('contactPhone').value.trim();
   const rumbleText   = document.getElementById('rumbleText').value.trim();
 
-  if (!contactName) { showStatus('Bitte einen Kontaktnamen eingeben.', 'error'); return; }
-  if (!rumbleText)  { showStatus('Bitte einen Rumble-Text eingeben.', 'error'); return; }
+  if (!contactName) { showStatus(TI18n.t('taskpane.needContactName'), 'error'); return; }
+  if (!rumbleText)  { showStatus(TI18n.t('taskpane.needRumbleText'), 'error'); return; }
 
   const btn = document.getElementById('btnSave');
   btn.disabled = true;
-  btn.textContent = 'Speichern…';
+  btn.textContent = TI18n.t('taskpane.rumbleSavingButton');
   clearStatus();
 
   try {
@@ -610,19 +633,19 @@ async function handleSave() {
       document.getElementById('followUpOptions')?.classList.add('hidden');
     }
 
-    showStatus('Rumble gespeichert ✓ Wird beim nächsten App-Start synchronisiert.', 'success');
+    showStatus(TI18n.t('taskpane.rumbleSavedSuccess'), 'success');
     document.getElementById('rumbleText').value = '';
   } catch (e) {
-    showStatus(`Fehler: ${e.message}`, 'error');
+    showStatus(TI18n.t('common.errorPrefix', { msg: e.message }), 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Rumble speichern';
+    btn.textContent = TI18n.t('taskpane.rumbleSaveButton');
   }
 }
 
 // ── Rumble Browse (Tab: Alle Rumbles / Teilnehmer) ────────────────────────
 function showTab(tab) {
-  ['rumble', 'contact', 'company', 'relations', 'settings'].forEach(t => {
+  ['rumble', 'company', 'relations', 'settings'].forEach(t => {
     document.getElementById(t + 'Pane')?.classList.toggle('hidden', t !== tab);
     document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
   });
@@ -631,8 +654,8 @@ function showTab(tab) {
     const searchEl = document.getElementById('rumbleSearch');
     if (searchEl) {
       searchEl.placeholder = participants.length
-        ? `Suche in ${participants.length} Teilnehmer-Rumbles…`
-        : 'Kontakt suchen…';
+        ? TI18n.tn('taskpane.relationsSearchAttendees', participants.length)
+        : TI18n.t('taskpane.contactSearchPlaceholder');
     }
     if (!_rumbleLoaded) loadAllRumbles();
     else renderAllRumbles(searchEl?.value || '');
@@ -644,8 +667,8 @@ function updateRelationsTabLabel() {
   const tabRelations = document.getElementById('tabRelations');
   if (!tabRelations) return;
   const labelSpan = tabRelations.querySelector('span:last-child') || tabRelations;
-  if (isAppt && _appointmentAttendeeNames.length) labelSpan.textContent = 'Teilnehmer';
-  else labelSpan.textContent = 'Relations';
+  if (isAppt && _appointmentAttendeeNames.length) labelSpan.textContent = TI18n.t('taskpane.tabRelationsAttendees');
+  else labelSpan.textContent = TI18n.t('taskpane.tabRelationsDefault');
 }
 
 // ── Participant picker ────────────────────────────────────────────────────
@@ -691,7 +714,7 @@ function _filterByNames(rumbles, names) {
 async function loadAllRumbles() {
   const panel = document.getElementById('rumbleBrowsePanel');
   if (!panel) return;
-  panel.innerHTML = '<div class="rumble-empty">Lade…</div>';
+  panel.innerHTML = `<div class="rumble-empty">${escapeTp(TI18n.t('taskpane.relationsLoading'))}</div>`;
   try {
     const listId = await getOrCreateTembuList();
     const data = await graphFetch('GET', `/me/todo/lists/${listId}/tasks?$filter=status ne 'completed'&$top=200`);
@@ -710,7 +733,7 @@ async function loadAllRumbles() {
     _rumbleLoaded = true;
     renderAllRumbles('');
   } catch (e) {
-    if (panel) panel.innerHTML = `<div class="rumble-empty">Fehler: ${escapeTp(e.message)}</div>`;
+    if (panel) panel.innerHTML = `<div class="rumble-empty">${escapeTp(TI18n.t('common.errorPrefix', { msg: e.message }))}</div>`;
   }
 }
 
@@ -732,9 +755,9 @@ function renderAllRumbles(filter) {
   const contacts = Object.keys(grouped).sort();
   if (!contacts.length) {
     const msg = participants.length
-      ? 'Keine Rumbles für die Teilnehmer.'
-      : (q ? 'Keine Treffer.' : 'Keine aktiven Rumbles.');
-    panel.innerHTML = `<div class="rumble-empty">${msg}</div>`;
+      ? TI18n.t('taskpane.rumblesForParticipantsEmpty')
+      : (q ? TI18n.t('taskpane.noMatches') : TI18n.t('taskpane.noActiveRumbles'));
+    panel.innerHTML = `<div class="rumble-empty">${escapeTp(msg)}</div>`;
     return;
   }
   panel.innerHTML = contacts.map(name => {
@@ -801,7 +824,7 @@ function updateCompanyButton() {
 // ── Contact Intelligence Detail Dialog ───────────────────────────────────
 function openDetailDialog() {
   const contactName = document.getElementById('contactName')?.value?.trim();
-  if (!contactName) { showStatus('Bitte zuerst einen Kontakt auswählen.', 'error'); return; }
+  if (!contactName) { showStatus(TI18n.t('taskpane.contactSelectFirst'), 'error'); return; }
 
   // Dialog-localStorage ist in Outlook Desktop isoliert → Token direkt im URL-Parameter übergeben
   const params = new URLSearchParams({ name: contactName, email: _contactEmail || '', t: _token || '', _v: '20260701a' });
@@ -810,7 +833,7 @@ function openDetailDialog() {
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {
-        showStatus('Detail-Fenster konnte nicht geöffnet werden.', 'error');
+        showStatus(TI18n.t('taskpane.errOpenDetail'), 'error');
       }
     }
   );
@@ -818,13 +841,13 @@ function openDetailDialog() {
 
 function openCompanyDialog() {
   const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
-  if (!domain) { showStatus('Keine Firmen-Domain erkannt.', 'error'); return; }
+  if (!domain) { showStatus(TI18n.t('taskpane.noCompanyDomain'), 'error'); return; }
   const params = new URLSearchParams({ domain, t: _token || '', _v: '20260701a' });
   const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/company.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {
-        showStatus('Firma-Fenster konnte nicht geöffnet werden.', 'error');
+        showStatus(TI18n.t('taskpane.errOpenCompany'), 'error');
       }
     }
   );
@@ -836,7 +859,7 @@ function openBatchDialog() {
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {
-        showStatus('Batch-Fenster konnte nicht geöffnet werden.', 'error');
+        showStatus(TI18n.t('taskpane.errOpenBatch'), 'error');
       }
     }
   );
@@ -848,7 +871,7 @@ function runDiag() {
 
   const d = Office.context.diagnostics || {};
 
-  let scopeInfo = 'Token: KEIN TOKEN';
+  let scopeInfo = TI18n.t('taskpane.diagNoToken');
   if (_token) {
     try {
       const payload = _token.split('.')[1];
@@ -856,20 +879,20 @@ function runDiag() {
       const decoded = JSON.parse(atob(padded));
       const scopes = (decoded.scp || decoded.roles || '').split(' ');
       const hasFiles = scopes.some(s => s.toLowerCase().includes('files'));
-      scopeInfo = 'Token: ' + _token.slice(0, 12) + '…\nScopes: ' + scopes.join(', ') + '\nFiles.ReadWrite: ' + (hasFiles ? '✓ JA' : '✗ FEHLT — Abmelden + neu anmelden!');
-    } catch { scopeInfo = 'Token: Decode-Fehler'; }
+      scopeInfo = 'Token: ' + _token.slice(0, 12) + '…\n' + TI18n.t('taskpane.diagScopesLabel') + ' ' + scopes.join(', ') + '\nFiles.ReadWrite: ' + (hasFiles ? TI18n.t('taskpane.diagFilesYes') : TI18n.t('taskpane.diagFilesMissing'));
+    } catch { scopeInfo = 'Token: Decode error'; }
   }
 
   const info = [
-    'Host: ' + (d.host || '?'),
-    'Platform: ' + (d.platform || '?'),
-    'Version: ' + (d.version || '?'),
+    TI18n.t('taskpane.diagHost') + ' ' + (d.host || '?'),
+    TI18n.t('taskpane.diagPlatform') + ' ' + (d.platform || '?'),
+    TI18n.t('taskpane.diagVersion') + ' ' + (d.version || '?'),
     'DisplayLanguage: ' + (Office.context.displayLanguage || '?'),
     scopeInfo,
   ].join('\n');
 
   const results = [];
-  out.textContent = info + '\n\nTeste URLs…';
+  out.textContent = info + '\n\n' + TI18n.t('taskpane.diagTestingUrls');
 
   const tests = [
     { label: 'github.io/auth.html', url: AUTH_URL },
@@ -877,19 +900,19 @@ function runDiag() {
     { label: 'taskpane URL', url: document.URL },
   ];
   const contactName = document.getElementById('contactName')?.value?.trim();
-  let dirInfo = '\nVerzeichnis: ' + _contactDirectory.length + ' Kontakte geladen';
+  let dirInfo = '\n' + TI18n.t('taskpane.diagDirectory', { n: _contactDirectory.length });
   if (contactName) {
     const entry = _contactDirectory.find(c => nameMatch(c.name, contactName));
-    dirInfo += '\nKontakt "' + contactName + '": ';
-    dirInfo += entry ? '"' + entry.name + '" → ' + (entry.phone || '(keine Nummer im Graph)') : 'nicht gefunden';
+    dirInfo += '\n' + TI18n.t('taskpane.diagContactLabel', { name: contactName });
+    dirInfo += entry ? '"' + entry.name + '" → ' + (entry.phone || TI18n.t('taskpane.diagNoNumber')) : TI18n.t('taskpane.diagNotFound');
   }
-  out.textContent = info + dirInfo + '\ntaskpane lädt von: ' + document.URL + '\n\nTeste URLs…';
+  out.textContent = info + dirInfo + '\n' + TI18n.t('taskpane.diagTaskpaneLoadedFrom') + ' ' + document.URL + '\n\n' + TI18n.t('taskpane.diagTestingUrls');
 
   const taskpaneUrl = document.URL;
   let i = 0;
   function next() {
     if (i >= tests.length) {
-      out.textContent = info + dirInfo + '\ntaskpane von: ' + taskpaneUrl + '\n\n' + results.join('\n');
+      out.textContent = info + dirInfo + '\n' + TI18n.t('taskpane.diagTaskpaneLoadedFrom') + ' ' + taskpaneUrl + '\n\n' + results.join('\n');
       return;
     }
     const t = tests[i++];
@@ -898,7 +921,7 @@ function runDiag() {
       { height: 1, width: 1, promptBeforeOpen: false },
       (r) => {
         if (r.status === Office.AsyncResultStatus.Failed) {
-          results.push(t.label + ': FEHLER code ' + r.error.code);
+          results.push(t.label + ': ' + TI18n.t('taskpane.diagErrorCode', { code: r.error.code }));
         } else {
           results.push(t.label + ': OK ✓');
           r.value.close();

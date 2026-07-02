@@ -10,7 +10,10 @@
 <script>
 /* globals Office, msal */
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
-const REDIRECT_URI = 'https://gkaufmannzh.github.io/tembu-addin/outlook-addin/auth.html';
+// Dynamisch statt fest verdrahtet, damit dieselbe Datei sowohl auf localhost:5001 (lokaler
+// Test) als auch auf gkaufmannzh.github.io (Produktiv) korrekt funktioniert. WICHTIG: beide
+// exakten URLs müssen in der Azure-AD-App-Registrierung als SPA-Redirect-URI eingetragen sein.
+const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read', 'Files.ReadWrite'];
 
 // Sichtbares Log direkt im Fenster, damit man ohne DevTools sieht, wo es hängt.

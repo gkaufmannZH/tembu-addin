@@ -1,7 +1,11 @@
 /* globals Office, msal */
 
 const CLIENT_ID    = '6a0f7ccb-afe3-4045-9b45-721d2046fafb';
-const AUTH_URL     = 'https://gkaufmannzh.github.io/tembu-addin/outlook-addin/auth.html';
+// Muss auf derselben Domain liegen wie die Taskpane selbst (Office-Dialog-API-Vorgabe) –
+// sonst wird der Nachrichtenkanal zur Taskpane nie richtig aufgebaut und messageParent()
+// aus dem Dialog geht lautlos ins Leere. Deshalb dynamisch von der eigenen Origin ableiten
+// statt fest auf die GitHub-Pages-Domain zu verdrahten.
+const AUTH_URL     = new URL('auth.html', document.baseURI).href;
 const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Read', 'Calendars.Read', 'Files.ReadWrite'];
 const TEMBU_LIST   = 'Tembu';
 const SESSION_KEY  = '@tembu_outlook_session';

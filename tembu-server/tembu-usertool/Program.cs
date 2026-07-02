@@ -10,7 +10,7 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 Console.Title = "Tembu User Tool";
 Console.ForegroundColor = ConsoleColor.Cyan;
 Console.WriteLine("╔══════════════════════════════════════╗");
-Console.WriteLine("║     TEMBU USER TOOL  v2.0            ║");
+Console.WriteLine("║     TEMBU USER TOOL  v2.1            ║");
 Console.WriteLine("╚══════════════════════════════════════╝");
 Console.ResetColor();
 Console.WriteLine();
@@ -20,6 +20,7 @@ Console.WriteLine("Was möchten Sie tun?");
 Console.WriteLine("  [1]  Neue users.dat erstellen");
 Console.WriteLine("  [2]  Lizenzschlüssel generieren");
 Console.WriteLine("  [3]  Bestehende users.dat anzeigen");
+Console.WriteLine("  [4]  KI-Einstellungen bearbeiten (ai-settings.json)");
 Console.Write("\nAuswahl: ");
 var mode = Console.ReadLine()?.Trim();
 Console.WriteLine();
@@ -29,6 +30,7 @@ switch (mode)
     case "1": CreateUserFile(); break;
     case "2": GenerateLicenseKey(); break;
     case "3": ShowUserFile(); break;
+    case "4": EditAiSettings(); break;
     default:
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("Ungültige Auswahl.");
@@ -161,6 +163,117 @@ void ShowUserFile()
     }
 }
 
+void EditAiSettings()
+{
+    Console.ForegroundColor = ConsoleColor.White;
+    Console.WriteLine("─── KI-Einstellungen bearbeiten ─────────────────────────");
+    Console.ResetColor();
+
+    Console.Write("Pfad zur ai-settings.json (Enter = ai-settings.json im aktuellen Verzeichnis): ");
+    var path = Console.ReadLine()?.Trim();
+    if (string.IsNullOrEmpty(path)) path = "ai-settings.json";
+
+    var current = new AiSettingsSection();
+    if (File.Exists(path))
+    {
+        try
+        {
+            var loaded = JsonSerializer.Deserialize<AiSettingsFile>(File.ReadAllText(path));
+            if (loaded?.AI != null) current = loaded.AI;
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"Warnung: Datei konnte nicht gelesen werden ({ex.Message}), starte mit leeren Werten.");
+            Console.ResetColor();
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("Aktuell:");
+    Console.WriteLine($"  Provider: {current.Provider}");
+    Console.WriteLine($"  API-Key:  {MaskKey(current.ApiKey)}");
+    Console.WriteLine($"  Model:    {(current.Model.Length > 0 ? current.Model : "(Provider-Standard)")}");
+    Console.WriteLine($"  Endpoint: {(current.Endpoint.Length > 0 ? current.Endpoint : "(Provider-Standard)")}");
+    Console.WriteLine();
+
+    var providers = new[] { "gemini", "anthropic", "openai", "groq", "ollama", "lmstudio" };
+    Console.WriteLine("Provider wählen (Enter = unverändert lassen):");
+    for (var i = 0; i < providers.Length; i++)
+        Console.WriteLine($"  [{i + 1}]  {providers[i]}" + (providers[i] == current.Provider ? "  (aktuell)" : ""));
+    Console.Write("Auswahl: ");
+    var providerChoice = Console.ReadLine()?.Trim();
+    var provider = current.Provider;
+    if (int.TryParse(providerChoice, out var idx) && idx >= 1 && idx <= providers.Length)
+        provider = providers[idx - 1];
+
+    var isLocal = provider is "ollama" or "lmstudio";
+
+    var apiKey = current.ApiKey;
+    if (!isLocal)
+    {
+        Console.Write($"API-Key (Enter = unverändert, aktuell: {MaskKey(current.ApiKey)}): ");
+        var keyInput = ReadMasked();
+        if (!string.IsNullOrEmpty(keyInput)) apiKey = keyInput;
+    }
+
+    Console.Write("Model (Enter = unverändert): ");
+    var modelInput = Console.ReadLine()?.Trim();
+    var model = string.IsNullOrEmpty(modelInput) ? current.Model : modelInput;
+
+    var endpoint = current.Endpoint;
+    if (isLocal)
+    {
+        var def = provider == "lmstudio" ? "http://localhost:1234" : "http://localhost:11434";
+        Console.Write($"Endpoint (Enter = unverändert, {(current.Endpoint.Length > 0 ? "aktuell: " + current.Endpoint : "Standard: " + def)}): ");
+        var endpointInput = Console.ReadLine()?.Trim();
+        if (!string.IsNullOrEmpty(endpointInput)) endpoint = endpointInput;
+    }
+
+    var result = new AiSettingsFile { AI = new AiSettingsSection { Provider = provider, ApiKey = apiKey, Model = model, Endpoint = endpoint } };
+    File.WriteAllText(path, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine();
+    Console.WriteLine($"✓ Gespeichert: {Path.GetFullPath(path)}");
+    Console.WriteLine($"  Provider: {provider}");
+    Console.WriteLine($"  API-Key:  {MaskKey(apiKey)}");
+    Console.WriteLine($"  Model:    {(model.Length > 0 ? model : "(Provider-Standard)")}");
+    Console.WriteLine($"  Endpoint: {(endpoint.Length > 0 ? endpoint : "(Provider-Standard)")}");
+    Console.WriteLine("  Läuft tembu-server bereits, übernimmt er die Änderung sofort (kein Neustart nötig).");
+    Console.ResetColor();
+}
+
+static string MaskKey(string key)
+{
+    if (string.IsNullOrEmpty(key)) return "(nicht gesetzt)";
+    if (key.Length <= 8) return new string('•', key.Length);
+    return key[..4] + new string('•', key.Length - 8) + key[^4..];
+}
+
+static string ReadMasked()
+{
+    if (Console.IsInputRedirected) return Console.ReadLine()?.Trim() ?? "";
+
+    var sb = new StringBuilder();
+    ConsoleKeyInfo key;
+    while ((key = Console.ReadKey(intercept: true)).Key != ConsoleKey.Enter)
+    {
+        if (key.Key == ConsoleKey.Backspace)
+        {
+            if (sb.Length > 0) { sb.Length--; Console.Write("\b \b"); }
+            continue;
+        }
+        if (!char.IsControl(key.KeyChar))
+        {
+            sb.Append(key.KeyChar);
+            Console.Write('*');
+        }
+    }
+    Console.WriteLine();
+    return sb.ToString();
+}
+
 // ── Crypto ────────────────────────────────────────────────────────────────────
 
 static byte[] DeriveKey()
@@ -220,4 +333,18 @@ record UserListData
     public string Customer { get; init; } = "";
     public string Created  { get; init; } = "";
     public List<string> Users { get; init; } = [];
+}
+
+// Struktur muss zu tembu-server\Models\AiSettings.cs / Program.cs-Sektion "AI" passen
+record AiSettingsFile
+{
+    public AiSettingsSection AI { get; init; } = new();
+}
+
+record AiSettingsSection
+{
+    public string Provider { get; init; } = "gemini";
+    public string ApiKey   { get; init; } = "";
+    public string Model    { get; init; } = "";
+    public string Endpoint { get; init; } = "";
 }

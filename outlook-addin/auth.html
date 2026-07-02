@@ -14,7 +14,10 @@ const SCOPES       = ['User.Read', 'Tasks.ReadWrite', 'Contacts.Read', 'Mail.Rea
 
 const msalInstance = new msal.PublicClientApplication({
   auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: REDIRECT_URI },
-  cache: { cacheLocation: 'localStorage' },
+  // storeAuthStateInCookie: der Office-Dialog-WebView übersteht die Navigation zu
+  // login.microsoftonline.com und zurück nicht zuverlässig mit sessionStorage allein –
+  // ohne dieses Flag verliert MSAL den PKCE/State und handleRedirectPromise() hängt/loopt.
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: true },
 });
 
 Office.initialize = async function () {

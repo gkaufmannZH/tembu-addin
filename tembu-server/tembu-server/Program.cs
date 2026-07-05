@@ -21,6 +21,8 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<AiService>();
 builder.Services.AddSingleton<UserListService>();
 builder.Services.AddSingleton<GraphAuthService>();
+builder.Services.AddSingleton<GraphDataService>();
+builder.Services.AddSingleton<GraphExtractionService>();
 builder.Host.UseWindowsService();
 
 builder.Services.AddCors();

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using tembu_server.Models;
 
@@ -15,15 +16,20 @@ public class AiService
         _settings = settings;
     }
 
-    public Task<string> CallAsync(string prompt)
+    // jsonSchema: optionales JSON-Schema fuer strukturierten Output (response_format), erzwingt
+    // Enum-Werte/Feldnamen beim Sampling statt sich nur auf die Prompt-Anweisung zu verlassen.
+    // Wird aktuell nur fuer den OpenAI-kompatiblen Pfad (openai/groq/ollama) durchgereicht —
+    // Anthropic/Gemini haben andere Mechanismen dafuer (Tool-Use bzw. response_schema), das ist
+    // hier bewusst nicht mit abgedeckt, da aktuell nur Ollama konfiguriert/getestet ist.
+    public Task<string> CallAsync(string prompt, string? jsonSchema = null)
     {
         var s = _settings.CurrentValue;
         return s.Provider switch
         {
-            "openai"    => CallOpenAICompatAsync(prompt, s.ApiKey, "https://api.openai.com/v1", s.Model.Length > 0 ? s.Model : "gpt-4o-mini"),
+            "openai"    => CallOpenAICompatAsync(prompt, s.ApiKey, "https://api.openai.com/v1", s.Model.Length > 0 ? s.Model : "gpt-4o-mini", jsonSchema),
             "anthropic" => CallAnthropicAsync(prompt, s),
-            "groq"      => CallOpenAICompatAsync(prompt, s.ApiKey, "https://api.groq.com/openai/v1", s.Model.Length > 0 ? s.Model : "llama-3.1-70b-versatile"),
-            "ollama"    => CallOpenAICompatAsync(prompt, null, (s.Endpoint.Length > 0 ? s.Endpoint : "http://localhost:11434") + "/v1", s.Model.Length > 0 ? s.Model : "qwen2.5:14b"),
+            "groq"      => CallOpenAICompatAsync(prompt, s.ApiKey, "https://api.groq.com/openai/v1", s.Model.Length > 0 ? s.Model : "llama-3.1-70b-versatile", jsonSchema),
+            "ollama"    => CallOpenAICompatAsync(prompt, null, (s.Endpoint.Length > 0 ? s.Endpoint : "http://localhost:11434") + "/v1", s.Model.Length > 0 ? s.Model : "qwen2.5:14b", jsonSchema),
             _           => CallGeminiAsync(prompt, s)
         };
     }
@@ -64,17 +70,33 @@ public class AiService
         return content[0].GetProperty("text").GetString() ?? "";
     }
 
-    private async Task<string> CallOpenAICompatAsync(string prompt, string? apiKey, string baseUrl, string model)
+    private async Task<string> CallOpenAICompatAsync(string prompt, string? apiKey, string baseUrl, string model, string? jsonSchema = null)
     {
+        var body = new JsonObject
+        {
+            ["model"] = model,
+            ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = prompt }),
+            ["max_tokens"] = 4096,
+            ["temperature"] = 0.3,
+        };
+
+        if (jsonSchema != null)
+        {
+            body["response_format"] = new JsonObject
+            {
+                ["type"] = "json_schema",
+                ["json_schema"] = new JsonObject
+                {
+                    ["name"] = "graph_extraction",
+                    ["schema"] = JsonNode.Parse(jsonSchema),
+                    ["strict"] = true,
+                },
+            };
+        }
+
         using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
         if (apiKey != null) req.Headers.Add("Authorization", $"Bearer {apiKey}");
-        req.Content = new StringContent(JsonSerializer.Serialize(new
-        {
-            model,
-            messages  = new[] { new { role = "user", content = prompt } },
-            max_tokens  = 4096,
-            temperature = 0.3
-        }), Encoding.UTF8, "application/json");
+        req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         var response = await _http.SendAsync(req);
         var json = await response.Content.ReadAsStringAsync();
         var doc  = TryParse(json);

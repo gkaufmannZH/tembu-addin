@@ -77,4 +77,25 @@ public class AnalyzeController : ControllerBase
             return StatusCode(500, ex.Message);
         }
     }
+
+    // Fasst mehrere E-Mail-Unterhaltungen fuer den Emails-Tab im Kontakt-Detail zusammen.
+    // Der Client ruft das nur fuer Unterhaltungen auf, die seit der zuletzt gespeicherten
+    // Zusammenfassung neue Mails haben — die Ergebnisse werden clientseitig gecacht.
+    [HttpPost("conversations")]
+    public async Task<IActionResult> AnalyzeConversations([FromBody] ConversationSummaryRequest data)
+    {
+        var (_, error) = await AuthorizeAsync();
+        if (error != null) return error;
+
+        try
+        {
+            var prompt = PromptBuilder.BuildConversationSummaries(data);
+            var result = await _ai.CallAsync(prompt);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
 }

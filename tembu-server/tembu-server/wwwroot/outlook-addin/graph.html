@@ -1,0 +1,1347 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tembu Beziehungsgraph</title>
+<script src="../shared/tembu-core.js?v=20260701w"></script>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --surface-2: #eef1f5;
+    --ink: #14181f;
+    --ink-muted: #5b6472;
+    --ink-faint: #94a0ad;
+    --line: #dfe4ea;
+    --person: #2a78d6;
+    --org: #1baf7a;
+    --topic: #eda100;
+    --focus: #2a78d6;
+    --radius-sm: 5px;
+    --radius-md: 9px;
+    --font-display: Charter, "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    flex: 0 0 auto;
+  }
+  header h1 {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  header .meta {
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  header .spacer { flex: 1; }
+  header .note {
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    max-width: 260px;
+    text-align: right;
+    line-height: 1.4;
+  }
+
+  .layout {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 292px 1fr;
+    min-height: 0;
+  }
+
+  aside {
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+  }
+  .field input[type="text"] {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .field input[type="text"]:focus-visible { border-color: var(--focus); }
+  .hit-count { font-size: 11.5px; color: var(--ink-faint); margin-top: 5px; }
+
+  .chip-row { display: flex; flex-direction: column; gap: 6px; }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: left;
+  }
+  .chip[aria-pressed="false"] { opacity: 0.42; }
+  .chip .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .chip .name { flex: 1; }
+  .chip .count { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat {
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+  }
+  .stat .n {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .stat .l { font-size: 10.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .toggle-row { display: flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+  .toggle-row button {
+    flex: 1;
+    padding: 7px 0;
+    background: var(--surface);
+    border: none;
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-muted);
+    cursor: pointer;
+    border-right: 1px solid var(--line);
+  }
+  .toggle-row button:last-child { border-right: none; }
+  .toggle-row button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+
+  .divider { height: 1px; background: var(--line); }
+
+  #detail { font-size: 13px; }
+  #detail .empty { color: var(--ink-faint); font-size: 12.5px; line-height: 1.5; }
+  #detail .d-name { font-family: var(--font-display); font-size: 16px; font-weight: 600; text-wrap: balance; }
+  #detail .d-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--ink-muted); margin-top: 3px; }
+  #detail .d-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+  #detail .d-id { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); margin-top: 4px; word-break: break-all; }
+  #detail .d-degree { font-size: 11.5px; color: var(--ink-muted); margin-top: 8px; font-variant-numeric: tabular-nums; }
+  #detail .d-rels { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+  #detail .rel-row {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    padding: 5px 7px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    cursor: pointer;
+    font-size: 12px;
+    border: none;
+    width: 100%;
+    text-align: left;
+    font-family: var(--font-body);
+    color: var(--ink);
+  }
+  #detail .rel-row:hover { background: var(--line); }
+  #detail .rel-arrow { color: var(--ink-faint); flex: 0 0 auto; }
+  #detail .rel-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #detail .rel-type { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-muted); flex: 0 0 auto; }
+
+  main {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  #stage { display: block; width: 100%; height: 100%; cursor: grab; }
+  #stage.dragging { cursor: grabbing; }
+
+  #loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--bg);
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+  #loading .bar { width: 220px; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  #loading .bar > div { height: 100%; width: 0%; background: var(--person); transition: width 0.08s linear; }
+
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--ink);
+    color: var(--surface);
+    font-size: 12px;
+    padding: 6px 9px;
+    border-radius: var(--radius-sm);
+    max-width: 240px;
+    line-height: 1.4;
+    display: none;
+    z-index: 5;
+    box-shadow: 0 4px 14px rgba(20,24,31,0.22);
+  }
+  #tooltip .tt-name { font-weight: 600; }
+  #tooltip .tt-meta { color: #c7ccd4; margin-top: 2px; }
+
+  #table-view {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: var(--surface);
+    overflow: auto;
+    padding: 18px 22px 40px;
+  }
+  #table-view h2 { font-family: var(--font-display); font-size: 15px; margin: 18px 0 8px; }
+  #table-view h2:first-child { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    text-align: left;
+    padding: 6px 10px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  thead th:hover { color: var(--ink); }
+  tbody td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:hover { background: var(--surface-2); }
+  td.mono, th.mono { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-muted); }
+  .type-tag { display: inline-flex; align-items: center; gap: 5px; }
+  .type-tag .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  .entity-group { display: flex; flex-direction: column; gap: 6px; }
+  .entity-group label { display: flex; align-items: center; gap: 6px; }
+  .entity-group label .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .entity-list { display: flex; flex-direction: column; gap: 1px; max-height: 140px; overflow-y: auto; }
+  .entity-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 4px 7px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: left;
+  }
+  .entity-item:hover { background: var(--surface-2); }
+  .entity-item .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entity-item .c { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); flex: 0 0 auto; }
+  .entity-item[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .entity-item[aria-pressed="true"] .c { color: var(--ink-faint); }
+  .entity-list .empty-hint { font-size: 11.5px; color: var(--ink-faint); padding: 4px 7px; }
+  .filter-hint {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--ink-muted);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+  }
+  .filter-hint button { border: none; background: none; color: var(--focus); font-size: 11.5px; font-weight: 600; cursor: pointer; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #loading .bar > div { transition: none; }
+  }
+</style>
+</head>
+<body data-palette="#2a78d6,#1baf7a,#eda100">
+
+<header>
+  <h1>Beziehungsgraph</h1>
+  <div class="meta" id="headerMeta">…</div>
+  <div class="spacer"></div>
+  <div class="note">Aus deiner Mailbox erzeugt über deinen Tembu-Server — Mail-Rohdaten verlassen dein Firmennetz nicht.</div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="field">
+      <label for="search">Suche</label>
+      <input type="text" id="search" placeholder="Name oder E-Mail…" autocomplete="off" />
+      <div class="hit-count" id="hitCount"></div>
+    </div>
+
+    <div class="field">
+      <label>Entitäten</label>
+      <div class="chip-row" id="typeChips"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <div class="filter-hint" id="filterHint">
+        <span id="filterHintText"></span>
+        <button id="btnClearFilter">Filter aufheben</button>
+      </div>
+      <div class="entity-group">
+        <label><span class="dot" style="background:var(--org)"></span>Organisationen</label>
+        <div class="entity-list" id="listOrganization"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="entity-group">
+        <label><span class="dot" style="background:var(--person)"></span>Personen</label>
+        <div class="entity-list" id="listPerson"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="entity-group">
+        <label><span class="dot" style="background:var(--topic)"></span>Themen</label>
+        <div class="entity-list" id="listTopic"></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Umfang</label>
+      <div class="stat-grid" id="statGrid"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Ansicht</label>
+      <div class="toggle-row">
+        <button id="btnViewGraph" aria-pressed="true">Graph</button>
+        <button id="btnViewTable" aria-pressed="false">Tabelle</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <button id="btnRefresh" class="chip" style="justify-content:center">↻ Graph aktualisieren</button>
+      <div class="hit-count" id="cacheInfo"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Auswahl</label>
+      <div id="detail"><p class="empty">Über einen Knoten hovern oder ihn anklicken, um seine Beziehungen zu sehen.</p></div>
+    </div>
+  </aside>
+
+  <main>
+    <canvas id="stage"></canvas>
+    <div id="tooltip"></div>
+    <div id="loading">
+      <div id="loadingText">Lade Daten aus deiner Mailbox — das kann bei großen Postfächern etwas dauern…</div>
+      <div class="bar"><div id="loadingBar"></div></div>
+    </div>
+    <div id="table-view">
+      <h2>Entitäten</h2>
+      <div style="overflow-x:auto">
+        <table id="entityTable">
+          <thead>
+            <tr>
+              <th data-sort="name">Name</th>
+              <th data-sort="type">Typ</th>
+              <th data-sort="degree" class="mono">Grad</th>
+              <th data-sort="id" class="mono">Id</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h2>Beziehungen</h2>
+      <div style="overflow-x:auto">
+        <table id="relationTable">
+          <thead>
+            <tr>
+              <th data-sort="fromName">Von</th>
+              <th data-sort="toName">Nach</th>
+              <th data-sort="type" class="mono">Typ</th>
+              <th data-sort="context">Kontext</th>
+              <th data-sort="date" class="mono">Datum</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const _params = new URLSearchParams(location.search);
+const _TOKEN = _params.get('t') || '';
+const _SRV   = (_params.get('srv') || '').trim().replace(/\/+$/, '');
+
+// NUR FUER DIE ENTWICKLUNG: schraenkt die Live-Extraktion auf ein Jahr ein, damit Testlaeufe
+// (LLM-Aufruf ueber die ganze Mailbox) schnell und die Ergebnismenge ueberschaubar bleiben.
+// Vor produktivem Einsatz auf null setzen — extract verarbeitet dann wieder die komplette
+// Mailbox (bzw. nur die Delta seit dem letzten deltaLink).
+const _DEV_YEAR_LIMIT = 2019;
+if (_DEV_YEAR_LIMIT) {
+  const noteEl = document.querySelector('header .note');
+  if (noteEl) noteEl.textContent += ' — Dev-Modus: nur Jahr ' + _DEV_YEAR_LIMIT;
+}
+
+// NUR FUER DIE ENTWICKLUNG: Ordner-IDs (der Server kaskadiert automatisch auf Unterordner),
+// die vom Extract ausgeschlossen werden sollen — dieselbe Auswahl wie beim manuellen
+// Testlauf vom 2026-07-03 (aus dem Taskpane-Diagnostics "Ordner zum Ausschluss kopieren").
+const _DEV_EXCLUDE_FOLDER_IDS = [
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAL-QzGmAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8OAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9GAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9LAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9KAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9IAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9JAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9HAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9DAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAAAAAELAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8cAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAAATdlXAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8aAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8nAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8sAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8vAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8oAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8tAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8uAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8pAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8qAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8rAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8wAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7LAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN75AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN74AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN73AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN72AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN71AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN76AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7fAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7nAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7oAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7lAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7kAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7jAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7iAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7gAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7hAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7pAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7tAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7qAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN70AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7zAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7yAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7mAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7wAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7xAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7vAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7uAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7sAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7rAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7VAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7UAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7TAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBWAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBGAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_cAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_dAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAYAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAkAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAmAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAlAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBcAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_eAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOARAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAoAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBdAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBeAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBfAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN90AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBIAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBNAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBMAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBKAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBLAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBJAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN98AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAnAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBVAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAXAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBFAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9fAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9xAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9wAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9gAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9hAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9iAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9jAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9zAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9kAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9mAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9pAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9qAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9rAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9sAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9tAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9uAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAeAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_oAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA1AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA2AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA3AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA5AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA4AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBEAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA6AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBAAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA-AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA_AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA9AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA8AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBCAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOA7AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBBAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBDAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBbAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAbAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN91AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBHAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN97AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-VAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAcAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAzAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOApAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAuAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAxAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAqAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAvAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAwAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOArAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAsAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAtAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAyAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBaAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBOAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBRAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBQAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBPAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBUAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBTAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBSAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBgAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-WAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAEAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOADAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOACAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOABAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAAAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAFAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-qAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-yAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-zAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-wAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-vAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-uAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-tAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-rAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-sAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-0AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-4AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-1AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN--AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-_AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-9AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-xAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-7AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-8AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-6AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-5AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-3AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-2AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-gAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-fAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-eAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-dAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-cAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAHAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-bAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-aAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-ZAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-YAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-XAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-hAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-iAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-kAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-jAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-lAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-pAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-mAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-nAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-oAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAGAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAJAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAIAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOALAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOANAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAKAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAMAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-UAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN92AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-TAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAdAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_nAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_kAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_lAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_mAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-CAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-FAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-SAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-RAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-QAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-DAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-PAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-EAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-OAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-LAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-MAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-NAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-GAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-HAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-IAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-JAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-KAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAfAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_jAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN93AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBXAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN-AAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOAPAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBZAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN9-AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_CAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_BAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_AAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_xAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_yAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_0AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_zAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_wAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_vAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_uAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_tAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN94AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_sAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_rAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUOBYAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_qAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_1AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_2AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_3AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN__AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_4AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_8AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_7AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_6AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_5AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN_9AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7SAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7RAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN78AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7QAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7PAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8xAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7OAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7NAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7MAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7WAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7XAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7ZAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7YAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7aAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7eAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7bAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7cAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7dAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN77AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7_AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN79AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8AAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8CAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7-AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN8BAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN63AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN66AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7HAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7GAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7FAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN64AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7EAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN65AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7DAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAApH3UnSAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAs0g0GcAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7AAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjrd7nTAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7BAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN7CAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAtdT5a8AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN67AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN68AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAs-57HQAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN69AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAufo0nUAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAs-57HPAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjrd7n8AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6_AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6-AAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAFxNhYjAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAFxNhYkAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAFxNhYlAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAFxNhYmAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6lAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6kAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6qAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6rAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6sAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6zAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6tAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6xAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6wAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6vAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6uAAA=',
+  'AAMkAGRmMjkzMGQ4LTZhNTEtNGQ1Zi1hMDIyLTAzMWNhODgxYjc4ZAAuAAAAAAA0iwDe7yTtQI7dVHIXz6ODAQDSMY5NQIxwQ782lgNO-VJvAAjkUN6yAAA='
+];
+
+async function extractRange(from, to) {
+  const body = (from || to) ? { from: from?.toISOString(), to: to?.toISOString() } : {};
+  if (_DEV_EXCLUDE_FOLDER_IDS.length) body.excludeFolderIds = _DEV_EXCLUDE_FOLDER_IDS;
+  const res = await fetch(_SRV + '/api/graph/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + _TOKEN },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text()).slice(0, 300));
+  return res.json();
+}
+
+// NUR FUER DIE ENTWICKLUNG: teilt das Dev-Jahr in kleinere Zeitfenster auf (statt eines
+// einzigen Aufrufs ueber das ganze Jahr), damit man Zwischenfortschritt sieht und ein
+// abgebrochener Lauf nicht alles verliert — nach jedem Haeppchen wird der bisherige
+// Zwischenstand nach OneDrive gespeichert. Macht die Gesamtzeit NICHT kuerzer (dieselbe
+// Mailmenge wird trotzdem komplett verarbeitet, nur in kleineren Portionen).
+const _DEV_CHUNK_MONTHS = 1;
+
+async function loadGraphData(onProgress) {
+  if (!_DEV_YEAR_LIMIT) return extractRange(null, null);
+
+  const totalChunks = Math.ceil(12 / _DEV_CHUNK_MONTHS);
+  const merged = { entities: [], relations: [] };
+  const seenEntityIds = new Set();
+
+  for (let i = 0; i < totalChunks; i++) {
+    const from = new Date(Date.UTC(_DEV_YEAR_LIMIT, i * _DEV_CHUNK_MONTHS, 1));
+    const to   = new Date(Date.UTC(_DEV_YEAR_LIMIT, (i + 1) * _DEV_CHUNK_MONTHS, 1));
+    if (onProgress) onProgress(i + 1, totalChunks, from, to);
+
+    const chunk = await extractRange(from, to);
+    (chunk.entities || []).forEach(e => {
+      if (!seenEntityIds.has(e.id)) { seenEntityIds.add(e.id); merged.entities.push(e); }
+    });
+    merged.relations.push(...(chunk.relations || []));
+
+    // Zwischenstand sichern, damit ein Abbruch mittendrin nicht alles verwirft.
+    TCore.saveKnowledgeGraph(_TOKEN, merged).catch(() => {});
+  }
+  return merged;
+}
+
+function buildGraph(RAW_DATA) {
+
+const TYPE_COLOR = { person: '#2a78d6', organization: '#1baf7a', topic: '#eda100' };
+const TYPE_LABEL = { person: 'Person', organization: 'Organisation', topic: 'Thema' };
+const REL_LABEL = {
+  communicated_with: 'kommuniziert mit',
+  works_on: 'arbeitet an',
+  belongs_to: 'gehört zu',
+  attended_meeting: 'nahm teil an',
+};
+
+// ── Datenaufbereitung ────────────────────────────────────────────────────
+const nodeById = new Map();
+RAW_DATA.entities.forEach(e => {
+  nodeById.set(e.id, {
+    id: e.id, type: e.type, name: e.name || e.id, email: e.email || '',
+    x: (Math.random() - 0.5) * 2400, y: (Math.random() - 0.5) * 1600,
+    dispX: 0, dispY: 0, degree: 0, visible: true,
+  });
+});
+
+// Relations, die auf unbekannte Ids verweisen (Batch-lokale Aufloesungsluecken),
+// werden hier stillschweigend uebersprungen statt das Rendering brechen zu lassen.
+const edges = RAW_DATA.relations
+  .filter(r => nodeById.has(r.from) && nodeById.has(r.to))
+  .map(r => ({ from: r.from, to: r.to, type: r.type, context: r.context, date: r.date }));
+
+edges.forEach(e => { nodeById.get(e.from).degree++; nodeById.get(e.to).degree++; });
+const nodes = [...nodeById.values()];
+
+const byId = id => nodeById.get(id);
+const adjacency = new Map(nodes.map(n => [n.id, []]));
+edges.forEach(e => { adjacency.get(e.from).push(e); adjacency.get(e.to).push(e); });
+
+const typeCounts = { person: 0, organization: 0, topic: 0 };
+nodes.forEach(n => typeCounts[n.type] = (typeCounts[n.type] || 0) + 1);
+const relTypeCounts = {};
+edges.forEach(e => relTypeCounts[e.type] = (relTypeCounts[e.type] || 0) + 1);
+
+// ── Header / Stats ───────────────────────────────────────────────────────
+document.getElementById('headerMeta').textContent =
+  nodes.length + ' Entitäten · ' + edges.length + ' Beziehungen';
+
+const statGrid = document.getElementById('statGrid');
+[
+  ['Personen', typeCounts.person || 0],
+  ['Organisationen', typeCounts.organization || 0],
+  ['Themen', typeCounts.topic || 0],
+  ['Beziehungen', edges.length],
+].forEach(([label, n]) => {
+  const d = document.createElement('div');
+  d.className = 'stat';
+  d.innerHTML = '<span class="n">' + n + '</span><span class="l">' + label + '</span>';
+  statGrid.appendChild(d);
+});
+
+// ── Typ-Filter-Chips ─────────────────────────────────────────────────────
+const activeTypes = new Set(['person', 'organization', 'topic']);
+const typeChips = document.getElementById('typeChips');
+Object.keys(TYPE_LABEL).forEach(type => {
+  const btn = document.createElement('button');
+  btn.className = 'chip';
+  btn.setAttribute('aria-pressed', 'true');
+  btn.innerHTML =
+    '<span class="dot" style="background:' + TYPE_COLOR[type] + '"></span>' +
+    '<span class="name">' + TYPE_LABEL[type] + '</span>' +
+    '<span class="count">' + (typeCounts[type] || 0) + '</span>';
+  btn.addEventListener('click', () => {
+    if (activeTypes.has(type)) activeTypes.delete(type); else activeTypes.add(type);
+    btn.setAttribute('aria-pressed', String(activeTypes.has(type)));
+    applyFilters();
+  });
+  typeChips.appendChild(btn);
+});
+
+// ── Entitäts-Listen (Organisationen/Personen/Themen) mit Cross-Filter ────
+// Auswahl in einer Liste (oder ein Klick auf einen Graph-Knoten, siehe selectEntity)
+// schraenkt die beiden ANDEREN Listen auf Entitaeten ein, die per relations[] mit der
+// Auswahl verbunden sind (neighborSet). Die Liste des ausgewaehlten Typs selbst bleibt
+// vollstaendig sichtbar, damit man die Auswahl leicht wechseln kann.
+const ENTITY_LIST_IDS = { organization: 'listOrganization', person: 'listPerson', topic: 'listTopic' };
+
+function renderEntityLists() {
+  const hint = document.getElementById('filterHint');
+  const hintText = document.getElementById('filterHintText');
+  if (selected) {
+    hint.style.display = 'flex';
+    hintText.textContent = 'Gefiltert nach „' + selected.name + '“';
+  } else {
+    hint.style.display = 'none';
+  }
+
+  const neighbors = selected ? neighborSet(selected) : null;
+
+  Object.keys(ENTITY_LIST_IDS).forEach(type => {
+    const container = document.getElementById(ENTITY_LIST_IDS[type]);
+    let items = nodes.filter(n => n.type === type);
+    if (selected && type !== selected.type) items = items.filter(n => neighbors.has(n.id));
+    items = items.slice().sort((a, b) => b.degree - a.degree || a.name.localeCompare(b.name));
+
+    if (!items.length) {
+      container.innerHTML = '<div class="empty-hint">Keine Treffer</div>';
+      return;
+    }
+    container.innerHTML = items.map(n =>
+      '<button class="entity-item" data-id="' + n.id.replace(/"/g, '&quot;') + '" aria-pressed="' + (!!selected && selected.id === n.id) + '">' +
+      '<span class="n">' + TCore.esc(n.name) + '</span>' +
+      '<span class="c">' + n.degree + '</span>' +
+      '</button>'
+    ).join('');
+    container.querySelectorAll('.entity-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const n2 = byId(btn.getAttribute('data-id'));
+        selectEntity(selected && n2 && selected.id === n2.id ? null : n2);
+      });
+    });
+  });
+}
+
+// Gemeinsamer Auswahl-Pfad fuer Graph-Klick, Detail-Relation-Klick und Listen-Klick,
+// damit alle drei Stellen synchron bleiben.
+function selectEntity(n) {
+  selected = n;
+  renderDetail(selected);
+  renderEntityLists();
+  draw();
+}
+
+document.getElementById('btnClearFilter').addEventListener('click', () => selectEntity(null));
+
+// ── Kraftgerichtetes Layout (Fruchterman–Reingold) ───────────────────────
+const LAYOUT_W = 2400, LAYOUT_H = 1600;
+const K = Math.sqrt((LAYOUT_W * LAYOUT_H) / Math.max(1, nodes.length));
+const TOTAL_ITERATIONS = 220;
+const ITER_PER_FRAME = 4;
+let temperature = LAYOUT_W * 0.05;
+let iteration = 0;
+
+function layoutStep() {
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const dist = Math.max(0.5, Math.hypot(dx, dy));
+      const force = (K * K) / dist;
+      const ux = dx / dist, uy = dy / dist;
+      a.dispX += ux * force; a.dispY += uy * force;
+      b.dispX -= ux * force; b.dispY -= uy * force;
+    }
+  }
+  edges.forEach(e => {
+    const a = byId(e.from), b = byId(e.to);
+    const dx = a.x - b.x, dy = a.y - b.y;
+    const dist = Math.max(0.5, Math.hypot(dx, dy));
+    const force = (dist * dist) / K;
+    const ux = dx / dist, uy = dy / dist;
+    a.dispX -= ux * force; a.dispY -= uy * force;
+    b.dispX += ux * force; b.dispY += uy * force;
+  });
+  nodes.forEach(n => {
+    const dlen = Math.max(0.01, Math.hypot(n.dispX, n.dispY));
+    const capped = Math.min(dlen, temperature);
+    n.x += (n.dispX / dlen) * capped;
+    n.y += (n.dispY / dlen) * capped;
+    n.x = Math.max(-LAYOUT_W / 2, Math.min(LAYOUT_W / 2, n.x));
+    n.y = Math.max(-LAYOUT_H / 2, Math.min(LAYOUT_H / 2, n.y));
+    n.dispX = 0; n.dispY = 0;
+  });
+  temperature *= 0.97;
+}
+
+function runLayout() {
+  for (let f = 0; f < ITER_PER_FRAME && iteration < TOTAL_ITERATIONS; f++, iteration++) layoutStep();
+  document.getElementById('loadingBar').style.width = Math.round((iteration / TOTAL_ITERATIONS) * 100) + '%';
+  if (iteration < TOTAL_ITERATIONS) {
+    requestAnimationFrame(runLayout);
+  } else {
+    fitView();
+    document.getElementById('loading').style.display = 'none';
+    draw();
+  }
+}
+
+// ── Canvas / View-Transform ──────────────────────────────────────────────
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+let view = { scale: 1, tx: 0, ty: 0 };
+let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+function resizeCanvas() {
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  draw();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function fitView() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
+    minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
+  });
+  const pad = 60;
+  const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
+  const scale = Math.min((rect.width - pad * 2) / w, (rect.height - pad * 2) / h, 1.4);
+  view.scale = scale;
+  view.tx = rect.width / 2 - ((minX + maxX) / 2) * scale;
+  view.ty = rect.height / 2 - ((minY + maxY) / 2) * scale;
+}
+
+function toScreen(n) { return [n.x * view.scale + view.tx, n.y * view.scale + view.ty]; }
+function nodeRadius(n) { return Math.min(4 + Math.sqrt(n.degree) * 1.6, 20); }
+
+// ── Auswahl / Hover / Suche ──────────────────────────────────────────────
+let hovered = null, selected = null, searchQuery = '';
+
+function neighborSet(n) {
+  const set = new Set([n.id]);
+  adjacency.get(n.id).forEach(e => { set.add(e.from); set.add(e.to); });
+  return set;
+}
+
+function applyFilters() {
+  const q = searchQuery.trim().toLowerCase();
+  let hits = 0;
+  nodes.forEach(n => {
+    const typeOk = activeTypes.has(n.type);
+    const searchOk = q.length === 0 || n.name.toLowerCase().includes(q) || n.email.toLowerCase().includes(q);
+    n.visible = typeOk;
+    n.matched = typeOk && q.length > 0 && searchOk;
+    if (n.matched) hits++;
+  });
+  document.getElementById('hitCount').textContent = q.length > 0 ? (hits + ' Treffer') : '';
+  draw();
+  renderTable();
+}
+
+document.getElementById('search').addEventListener('input', e => {
+  searchQuery = e.target.value;
+  applyFilters();
+});
+
+// ── Zeichnen ──────────────────────────────────────────────────────────────
+function draw() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, rect.width, rect.height);
+
+  const focusNode = hovered || selected;
+  const focusSet = focusNode ? neighborSet(focusNode) : null;
+  const q = searchQuery.trim().length > 0;
+
+  // Kanten
+  ctx.lineWidth = 1;
+  edges.forEach(e => {
+    const a = byId(e.from), b = byId(e.to);
+    if (!a.visible || !b.visible) return;
+    const inFocus = focusSet && focusSet.has(a.id) && focusSet.has(b.id);
+    if (focusSet && !inFocus) return;
+    const [ax, ay] = toScreen(a), [bx, by] = toScreen(b);
+    ctx.strokeStyle = inFocus ? 'rgba(20,24,31,0.55)' : 'rgba(91,100,114,0.16)';
+    ctx.lineWidth = inFocus ? 1.4 : 1;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  });
+
+  // Knoten
+  nodes.forEach(n => {
+    if (!n.visible) return;
+    const [x, y] = toScreen(n);
+    const r = nodeRadius(n) * Math.min(1.6, Math.max(0.6, view.scale));
+    const dim = (focusSet && !focusSet.has(n.id)) || (q && !n.matched && focusSet === null);
+    ctx.globalAlpha = dim ? 0.18 : 1;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = TYPE_COLOR[n.type] || '#94a0ad';
+    ctx.fill();
+    if (n === selected) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#14181f';
+      ctx.stroke();
+    } else if (n.matched) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#14181f';
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    const showLabel = !dim && (n.degree >= 9 || n === hovered || n === selected || n.matched);
+    if (showLabel) {
+      ctx.font = '11px ' + getComputedStyle(document.body).getPropertyValue('--font-body');
+      ctx.fillStyle = '#14181f';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.name, x + r + 4, y);
+    }
+  });
+}
+
+// ── Interaktion: Hover, Klick, Pan, Zoom, Drag ───────────────────────────
+function nodeAt(px, py) {
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i];
+    if (!n.visible) continue;
+    const [x, y] = toScreen(n);
+    const r = nodeRadius(n) * Math.min(1.6, Math.max(0.6, view.scale)) + 2;
+    if ((px - x) ** 2 + (py - y) ** 2 <= r * r) return n;
+  }
+  return null;
+}
+
+function renderDetail(n) {
+  const el = document.getElementById('detail');
+  if (!n) { el.innerHTML = '<p class="empty">Über einen Knoten hovern oder ihn anklicken, um seine Beziehungen zu sehen.</p>'; return; }
+  const rels = adjacency.get(n.id).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const relRows = rels.slice(0, 60).map(e => {
+    const outgoing = e.from === n.id;
+    const otherId = outgoing ? e.to : e.from;
+    const other = byId(otherId);
+    const arrow = outgoing ? '→' : '←';
+    return '<button class="rel-row" data-id="' + otherId.replace(/"/g, '&quot;') + '">' +
+      '<span class="rel-arrow">' + arrow + '</span>' +
+      '<span class="rel-name">' + (other ? other.name : otherId) + '</span>' +
+      '<span class="rel-type">' + (REL_LABEL[e.type] || e.type) + '</span>' +
+      '</button>';
+  }).join('');
+  el.innerHTML =
+    '<div class="d-name">' + n.name + '</div>' +
+    '<div class="d-badge"><span class="dot" style="background:' + TYPE_COLOR[n.type] + '"></span>' + TYPE_LABEL[n.type] + '</div>' +
+    '<div class="d-id">' + n.id + '</div>' +
+    '<div class="d-degree">' + n.degree + ' Beziehung' + (n.degree === 1 ? '' : 'en') + '</div>' +
+    '<div class="d-rels">' + relRows + '</div>';
+  el.querySelectorAll('.rel-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = byId(btn.getAttribute('data-id'));
+      if (target) selectEntity(target);
+    });
+  });
+}
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  if (isPanning) {
+    view.tx = panStartView.tx + (px - panStart.x);
+    view.ty = panStartView.ty + (py - panStart.y);
+    draw();
+    return;
+  }
+  const n = nodeAt(px, py);
+  if (n !== hovered) {
+    hovered = n;
+    draw();
+  }
+  const tooltip = document.getElementById('tooltip');
+  if (n) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = (px + 14) + 'px';
+    tooltip.style.top = (py + 10) + 'px';
+    tooltip.innerHTML = '<div class="tt-name">' + n.name + '</div><div class="tt-meta">' + TYPE_LABEL[n.type] + ' · ' + n.degree + ' Beziehungen</div>';
+  } else {
+    tooltip.style.display = 'none';
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hovered = null;
+  document.getElementById('tooltip').style.display = 'none';
+  draw();
+});
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  selectEntity(nodeAt(e.clientX - rect.left, e.clientY - rect.top));
+});
+
+let isPanning = false, panStart = { x: 0, y: 0 }, panStartView = { tx: 0, ty: 0 };
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  if (nodeAt(px, py)) return;
+  isPanning = true;
+  panStart = { x: px, y: py };
+  panStartView = { tx: view.tx, ty: view.ty };
+  canvas.classList.add('dragging');
+});
+window.addEventListener('mouseup', () => { isPanning = false; canvas.classList.remove('dragging'); });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const factor = Math.exp(-e.deltaY * 0.001);
+  const newScale = Math.min(6, Math.max(0.12, view.scale * factor));
+  view.tx = px - ((px - view.tx) / view.scale) * newScale;
+  view.ty = py - ((py - view.ty) / view.scale) * newScale;
+  view.scale = newScale;
+  draw();
+}, { passive: false });
+
+// ── Ansicht-Umschalter (Graph / Tabelle) ─────────────────────────────────
+const btnGraph = document.getElementById('btnViewGraph');
+const btnTable = document.getElementById('btnViewTable');
+const tableView = document.getElementById('table-view');
+btnGraph.addEventListener('click', () => {
+  btnGraph.setAttribute('aria-pressed', 'true');
+  btnTable.setAttribute('aria-pressed', 'false');
+  tableView.style.display = 'none';
+  resizeCanvas();
+});
+btnTable.addEventListener('click', () => {
+  btnGraph.setAttribute('aria-pressed', 'false');
+  btnTable.setAttribute('aria-pressed', 'true');
+  tableView.style.display = 'block';
+});
+
+// ── Tabellen-Ansicht ──────────────────────────────────────────────────────
+let entitySort = { key: 'degree', dir: -1 };
+let relationSort = { key: 'date', dir: -1 };
+
+function renderTable() {
+  const q = searchQuery.trim().toLowerCase();
+
+  const eBody = document.querySelector('#entityTable tbody');
+  const eRows = nodes
+    .filter(n => activeTypes.has(n.type))
+    .filter(n => q.length === 0 || n.name.toLowerCase().includes(q) || n.email.toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => {
+      const av = a[entitySort.key], bv = b[entitySort.key];
+      if (typeof av === 'number') return (av - bv) * entitySort.dir;
+      return String(av).localeCompare(String(bv)) * entitySort.dir;
+    });
+  eBody.innerHTML = eRows.map(n =>
+    '<tr><td>' + n.name + '</td>' +
+    '<td><span class="type-tag"><span class="dot" style="background:' + TYPE_COLOR[n.type] + '"></span>' + TYPE_LABEL[n.type] + '</span></td>' +
+    '<td class="mono">' + n.degree + '</td>' +
+    '<td class="mono">' + n.id + '</td></tr>'
+  ).join('');
+
+  const rBody = document.querySelector('#relationTable tbody');
+  const rRows = edges
+    .map(e => ({ ...e, fromName: byId(e.from).name, toName: byId(e.to).name }))
+    .filter(e => q.length === 0 || e.fromName.toLowerCase().includes(q) || e.toName.toLowerCase().includes(q) || (e.context || '').toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => {
+      const av = a[relationSort.key] || '', bv = b[relationSort.key] || '';
+      return String(av).localeCompare(String(bv)) * relationSort.dir;
+    });
+  rBody.innerHTML = rRows.map(e =>
+    '<tr><td>' + e.fromName + '</td><td>' + e.toName + '</td>' +
+    '<td class="mono">' + (REL_LABEL[e.type] || e.type) + '</td>' +
+    '<td>' + (e.context || '') + '</td>' +
+    '<td class="mono">' + (e.date || '') + '</td></tr>'
+  ).join('');
+}
+
+document.querySelectorAll('#entityTable thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.getAttribute('data-sort');
+    entitySort.dir = entitySort.key === key ? -entitySort.dir : 1;
+    entitySort.key = key;
+    renderTable();
+  });
+});
+document.querySelectorAll('#relationTable thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.getAttribute('data-sort');
+    relationSort.dir = relationSort.key === key ? -relationSort.dir : 1;
+    relationSort.key = key;
+    renderTable();
+  });
+});
+
+// ── Start ──────────────────────────────────────────────────────────────
+resizeCanvas();
+renderTable();
+renderEntityLists();
+requestAnimationFrame(runLayout);
+}
+
+// ── Laden: erst OneDrive-Cache (Tembu/graph/graph.json), nur beim ersten Mal oder auf
+// "Aktualisieren"-Klick eine volle Live-Extraktion (LLM-Aufruf, kann bei grossen Postfaechern
+// dauern). Kein inkrementelles Delta-Merge (mailDeltaLink/calendarDeltaLink werden mitgespeichert,
+// aber noch nicht fuers Nachladen genutzt) — vorlaeufig immer Voll-Extraktion beim Aktualisieren.
+async function initGraph(forceRefresh) {
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('loadingBar').style.width = '0%';
+  document.getElementById('loadingBar').style.background = '';
+  document.getElementById('loadingText').textContent = forceRefresh
+    ? 'Lade Daten aus deiner Mailbox — das kann bei großen Postfächern etwas dauern…'
+    : 'Lade gespeicherten Graphen…';
+
+  try {
+    let data = forceRefresh ? null : await TCore.loadKnowledgeGraph(_TOKEN);
+    if (data && data.entities && data.entities.length) {
+      document.getElementById('cacheInfo').textContent = 'Aus OneDrive geladen (' + new Date(data.savedAt).toLocaleString('de-CH') + ')';
+    } else {
+      const fmt = d => d.toLocaleDateString('de-CH', { month: 'short', year: 'numeric' });
+      data = await loadGraphData((i, total, from, to) => {
+        document.getElementById('loadingText').textContent =
+          'Lade Zeitraum ' + i + '/' + total + ' (' + fmt(from) + ' – ' + fmt(to) + ')…';
+        document.getElementById('loadingBar').style.width = Math.round((i - 1) / total * 100) + '%';
+      });
+      document.getElementById('cacheInfo').textContent = 'Gerade neu geladen — wird in OneDrive gespeichert…';
+      TCore.saveKnowledgeGraph(_TOKEN, data)
+        .then(() => document.getElementById('cacheInfo').textContent = 'Gerade neu geladen und in OneDrive gespeichert')
+        .catch(e => {
+          console.warn('[Tembu] Graph-Speichern in OneDrive fehlgeschlagen', e);
+          document.getElementById('cacheInfo').textContent = 'Neu geladen (Speichern in OneDrive fehlgeschlagen)';
+        });
+    }
+    buildGraph(data);
+  } catch (err) {
+    document.getElementById('loadingText').textContent = 'Fehler beim Laden: ' + (err.message || err);
+    document.getElementById('loadingBar').style.background = '#c0392b';
+  }
+}
+
+document.getElementById('btnRefresh').addEventListener('click', () => initGraph(true));
+initGraph(false);
+</script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 {
   "AI": {
-    "Provider": "gemini",
+    "Provider": "ollama",
     "ApiKey":   "",
-    "Model":    "",
-    "Endpoint": ""
+    "Model":    "qwen2.5:14b",
+    "Endpoint": "http://localhost:11434"
   }
 }

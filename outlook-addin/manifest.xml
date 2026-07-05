@@ -10,7 +10,7 @@
   <ProviderName>Tembu</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Tembu Rumbles (local)" />
-  <Description DefaultValue="Create a Rumble from Outlook – v20260701l (local)" />
+  <Description DefaultValue="Create a Rumble from Outlook – v20260701w (local)" />
   <IconUrl DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
   <HighResolutionIconUrl DefaultValue="https://localhost:5001/outlook-addin/assets/icon.png" />
   <SupportUrl DefaultValue="https://tembu.app" />
@@ -34,7 +34,7 @@
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
+        <SourceLocation DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701w" />
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -104,8 +104,8 @@
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
-        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701w" />
+        <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701w" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Tembu" />
@@ -190,8 +190,8 @@
         </bt:Images>
         <bt:Urls>
           <bt:Url id="Commands.Url" DefaultValue="https://localhost:5001/outlook-addin/commands.html" />
-          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
-          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701l" />
+          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701w" />
+          <bt:Url id="Taskpane.Appt.Url" DefaultValue="https://localhost:5001/outlook-addin/taskpane.html?v=20260701w" />
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="Tembu" />

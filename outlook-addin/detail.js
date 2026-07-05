@@ -15,6 +15,7 @@ let _contactName  = '';
 let _contactEmail = '';
 let _cacheKey     = '';
 let _rawData      = null;
+let _emailSummaries = {}; // conversationId -> { summary, latestDate }
 
 const esc = TCore.esc;
 
@@ -152,12 +153,19 @@ async function getCached(key) {
   } catch { return null; }
 }
 
+// Merged mit dem vorhandenen Datensatz statt ihn zu ersetzen — sonst wuerde z.B. ein
+// saveCache({emailSummaries}) das zuvor gespeicherte analysis/rawData ueberschreiben.
 async function saveCache(key, data) {
   try {
     const db = await openDB();
     return new Promise(resolve => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).put({ id: key, cachedAt: Date.now(), ...data });
+      const store = tx.objectStore(STORE_NAME);
+      const getReq = store.get(key);
+      getReq.onsuccess = () => {
+        const existing = getReq.result || {};
+        store.put({ ...existing, id: key, cachedAt: Date.now(), ...data });
+      };
       tx.oncomplete = () => resolve();
       tx.onerror    = () => resolve();
     });
@@ -169,6 +177,7 @@ async function loadData(force) {
   setLoading(TI18n.t('detail.loadingData'));
 
   const cached = await getCached(_cacheKey);
+  _emailSummaries = cached?.emailSummaries || {};
   const since = getSinceDate();
 
   setLoading(TI18n.t('detail.loadingEmailsMeetings'));
@@ -261,7 +270,7 @@ async function fetchEmails(since, top = 100) {
   if (!_contactEmail && !_contactName) return [];
   const s   = since.toISOString();
   const enc = encodeURIComponent;
-  const selEmail = '$select=id,subject,receivedDateTime,sentDateTime,from,toRecipients,bodyPreview,webLink';
+  const selEmail = '$select=id,subject,receivedDateTime,sentDateTime,from,toRecipients,bodyPreview,webLink,conversationId';
   const sinceDate = s.slice(0, 10);
   let diagMode = '', diagRaw = 0, diagFiltered = 0;
   try {
@@ -309,6 +318,7 @@ async function fetchEmails(since, top = 100) {
         subject: m.subject || TI18n.t('common.noSubject'), preview: (m.bodyPreview || '').slice(0, 200),
         fromEmail: m.from?.emailAddress?.address || '',
         fromName:  m.from?.emailAddress?.name    || '',
+        conversationId: m.conversationId || '',
         url: m.webLink || '' });
     }
     for (const m of sentItems) {
@@ -320,6 +330,7 @@ async function fetchEmails(since, top = 100) {
       }
       result.push({ id: m.id, date, type: 'email', direction: 'sent',
         subject: m.subject || TI18n.t('common.noSubject'), preview: (m.bodyPreview || '').slice(0, 200),
+        conversationId: m.conversationId || '',
         url: m.webLink || '' });
     }
     diagFiltered = result.length;
@@ -611,10 +622,137 @@ function renderBackground(text) {
 
 // ── Tab switching ─────────────────────────────────────────────────────────
 function showTab(name) {
-  ['Timeline', 'Themes', 'Background'].forEach(t => {
+  ['Timeline', 'Themes', 'Background', 'Emails'].forEach(t => {
     document.getElementById(`tab${t}`).classList.toggle('hidden', t !== name);
     document.getElementById(`tabBtn${t}`).classList.toggle('active', t === name);
   });
+  if (name === 'Emails') ensureEmailsTab();
+}
+
+// ── Emails-Tab: nach Unterhaltung gruppiert, KI-Zusammenfassung gecacht ────
+// Neu zusammengefasst wird eine Unterhaltung nur, wenn seit der gespeicherten
+// Zusammenfassung neuere Mails dazugekommen sind (latestDate-Vergleich) — sonst kein
+// erneuter LLM-Aufruf beim naechsten Oeffnen des Kontakts.
+const CONV_SUBJECT_PREFIX_RE = /^(AW|RE|FW|FWD|WG)\s*:\s*/i;
+
+function cleanSubject(subject) {
+  let s = (subject || '').trim(), prev;
+  do { prev = s; s = s.replace(CONV_SUBJECT_PREFIX_RE, '').trim(); } while (s !== prev);
+  return s || TI18n.t('common.noSubject');
+}
+
+function groupConversations(emails) {
+  const groups = new Map();
+  for (const e of emails) {
+    const key = e.conversationId || ('single:' + e.id);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  }
+  return [...groups.entries()]
+    .map(([id, items]) => {
+      const sorted = items.slice().sort((a, b) => b.date.localeCompare(a.date));
+      return { id, subject: cleanSubject(sorted[0].subject), emails: sorted, latestDate: sorted[0].date };
+    })
+    .sort((a, b) => b.latestDate.localeCompare(a.latestDate));
+}
+
+function parseConversationSummaries(raw) {
+  let text = raw.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+  try { return JSON.parse(text); } catch {}
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]); } catch {} }
+  return { summaries: [] };
+}
+
+async function ensureEmailsTab() {
+  if (!_rawData) return;
+  const conversations = groupConversations(_rawData.emails);
+  renderEmailsTab(conversations);
+
+  const stale = conversations.filter(c => {
+    const cached = _emailSummaries[c.id];
+    return !cached || cached.latestDate < c.latestDate;
+  });
+  if (!stale.length || !_serverUrl) return;
+
+  renderEmailsTab(conversations, /* loadingSummaries */ true, stale);
+  try {
+    const res = await fetch(`${_serverUrl}/api/analyze/conversations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_token}` },
+      body: JSON.stringify({
+        lang: TI18n.getLang(),
+        contactName: _contactName,
+        contactEmail: _contactEmail,
+        conversations: stale.map(c => ({
+          id: c.id,
+          subject: c.subject,
+          emails: c.emails.slice(0, 15).map(e => ({ dateStr: e.date, direction: e.direction, subject: e.subject, preview: e.preview })),
+        })),
+      }),
+    });
+    if (res.ok) {
+      const parsed = parseConversationSummaries(await res.text());
+      const staleLatest = new Map(stale.map(c => [c.id, c.latestDate]));
+      (parsed.summaries || []).forEach(s => {
+        if (staleLatest.has(s.id)) _emailSummaries[s.id] = { summary: s.summary, latestDate: staleLatest.get(s.id) };
+      });
+      await saveCache(_cacheKey, { emailSummaries: _emailSummaries });
+    }
+  } catch (e) {
+    console.warn('[tembu] Unterhaltungs-Zusammenfassung fehlgeschlagen', e);
+  }
+  renderEmailsTab(conversations);
+}
+
+function renderEmailsTab(conversations, loadingSummaries, staleList) {
+  const el = document.getElementById('emailsContent');
+  if (!conversations.length) {
+    el.innerHTML = `<div class="empty-state">${esc(TI18n.t('detail.emailsEmpty'))}</div>`;
+    return;
+  }
+  const stalePending = new Set((staleList || []).map(c => c.id));
+
+  el.innerHTML = conversations.map(c => {
+    const cached = _emailSummaries[c.id];
+    let summaryHtml = '';
+    if (cached) {
+      summaryHtml = `<div class="conv-summary">${esc(cached.summary)}</div>`;
+    } else if (loadingSummaries && stalePending.has(c.id)) {
+      summaryHtml = `<div class="conv-summary loading">${esc(TI18n.t('detail.summaryLoading'))}</div>`;
+    }
+    const emailRows = c.emails.map(item => `<div class="timeline-item">
+        <div class="tl-icon ${item.direction === 'received' ? 'tl-email-in' : 'tl-email-out'}">${item.direction === 'received' ? '📧' : '📤'}</div>
+        <div class="tl-body">
+          <div class="tl-header">
+            <span class="tl-date">${fmtDate(item.date)}</span>
+            <span class="tl-badge ${item.direction === 'received' ? 'b-email-in' : 'b-email-out'}">${item.direction === 'received' ? esc(TI18n.t('detail.receivedBadge')) : esc(TI18n.t('detail.sentBadge'))}</span>
+          </div>
+          <div class="tl-subject">${esc(item.subject)}</div>
+          ${item.preview ? `<div class="tl-preview">${esc(item.preview)}</div>` : ''}
+        </div>
+      </div>`).join('');
+    return `<div class="conv-card">
+      <div class="conv-header" onclick="toggleConversation(this)">
+        <div class="conv-main">
+          <div class="conv-subject">${esc(c.subject)}</div>
+          ${summaryHtml}
+        </div>
+        <div class="conv-meta">
+          <span class="conv-count">${esc(TI18n.tn('detail.emailCount', c.emails.length))}</span>
+          <span class="conv-toggle-arrow">▶</span>
+        </div>
+      </div>
+      <div class="conv-emails hidden">${emailRows}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleConversation(headerEl) {
+  const card = headerEl.closest('.conv-card');
+  const body = card.querySelector('.conv-emails');
+  const open = body.classList.toggle('hidden') === false;
+  headerEl.querySelector('.conv-toggle-arrow').textContent = open ? '▼' : '▶';
 }
 
 // ── UI state ──────────────────────────────────────────────────────────────

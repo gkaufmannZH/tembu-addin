@@ -1,2 +1,2 @@
 /* Tembu Build — einzige Stelle für die Versionsnummer */
-const TEMBU_BUILD = '20260701l';
+const TEMBU_BUILD = '20260701x';

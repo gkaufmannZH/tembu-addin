@@ -89,6 +89,48 @@ const TCore = (() => {
     } catch { return null; }
   }
 
+  // ── Knowledge-Graph-Cache (OneDrive) ─────────────────────────────────────
+  // Ein File pro Nutzer in einem eigenen Ordner (nicht Tembu/analysen) — der Graph ist
+  // mailbox-weit, nicht pro Kontakt, braucht also keinen cacheKey.
+  const GRAPH_ONEDRIVE_PATH = '/me/drive/root:/Tembu/graph/graph.json:/content';
+
+  async function ensureGraphFolder(token) {
+    const mk = async (path, name) => {
+      await fetch(GRAPH_BASE + path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }),
+      }); // 409 = existiert bereits → ignorieren
+    };
+    await mk('/me/drive/root/children', 'Tembu');
+    await mk('/me/drive/root:/Tembu:/children', 'graph');
+  }
+
+  let _graphFolderEnsured = false;
+  async function saveKnowledgeGraph(token, data) {
+    if (!_graphFolderEnsured) {
+      await ensureGraphFolder(token);
+      _graphFolderEnsured = true;
+    }
+    await graphPut(token, GRAPH_ONEDRIVE_PATH, JSON.stringify({
+      savedAt: new Date().toISOString(),
+      entities: data.entities || [],
+      relations: data.relations || [],
+      mailDeltaLink: data.mailDeltaLink || null,
+      calendarDeltaLink: data.calendarDeltaLink || null,
+    }));
+  }
+
+  async function loadKnowledgeGraph(token) {
+    try {
+      const res = await fetch(GRAPH_BASE + GRAPH_ONEDRIVE_PATH, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch { return null; }
+  }
+
   // ── To Do / Rumbles ───────────────────────────────────────────────────────
   function parseBody(text) {
     const r = {};
@@ -226,6 +268,8 @@ const TCore = (() => {
     analysisOneDrivePath,
     saveAnalysis,
     loadAnalysis,
+    saveKnowledgeGraph,
+    loadKnowledgeGraph,
     parseBody,
     getOrCreateTembuList,
     fetchRumbleTasks,

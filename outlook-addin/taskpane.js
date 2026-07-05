@@ -698,6 +698,9 @@ function showTab(tab) {
     document.getElementById(t + 'Pane')?.classList.toggle('hidden', t !== tab);
     document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
   });
+  // Vorlaeufig: Company-Pane hat noch keine eigene Ansicht (nur Platzhalter-Text) —
+  // oeffnet stattdessen direkt den Knowledge-Graph-Dialog.
+  if (tab === 'company') openGraphDialog();
   if (tab === 'relations') {
     const participants = _contextParticipants();
     const searchEl = document.getElementById('rumbleSearch');
@@ -856,7 +859,126 @@ function wireEvents() {
   document.getElementById('btnSaveRumble').addEventListener('click', handleSave);
   document.getElementById('btnAnalyzeContact').addEventListener('click', openDetailDialog);
   document.getElementById('btnDiag').addEventListener('click', runDiag);
+  document.getElementById('btnCopyToken').addEventListener('click', showToken);
+  document.getElementById('btnLoadFolders').addEventListener('click', loadFolderList);
+  document.getElementById('btnCopyExcludeFolders').addEventListener('click', copyExcludeFolders);
   document.getElementById('contactName').addEventListener('change', e => onContactNameChange(e.target.value));
+}
+
+// Nur fuers lokale Testen von /api/graph/extract — zeigt alle Mailordner als Baum (inkl.
+// Unterordner) an, damit der User auswaehlen kann, welche NICHT in den Knowledge Graph
+// einfliessen sollen (z.B. Papierkorb, Junk, aber auch einzelne Kunden-/Projektordner).
+// Ein angehakter Parent hakt automatisch alle Unterordner mit an (der Server schliesst sie
+// zusaetzlich robust ueber ExpandWithDescendantsAsync mit ein, auch falls hier was uebersehen wird).
+const DEFAULT_EXCLUDED_FOLDER_NAMES = ['gelöschte elemente', 'deleted items', 'junk-e-mail', 'junk email', 'courrier indésirable', 'correo no deseado'];
+
+let _folderCheckboxes = {};   // id -> <input type=checkbox>
+let _folderDescendantIds = {}; // id -> [alle Unterordner-IDs, rekursiv]
+
+function collectDescendantIds(folder) {
+  const ids = [];
+  (folder.children || []).forEach(c => { ids.push(c.id); ids.push(...collectDescendantIds(c)); });
+  return ids;
+}
+
+function renderFolderNode(folder, depth, container) {
+  const row = document.createElement('label');
+  row.style.cssText = `display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;padding-left:${depth * 16}px`;
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.value = folder.id;
+  cb.checked = DEFAULT_EXCLUDED_FOLDER_NAMES.includes((folder.name || '').toLowerCase());
+
+  _folderCheckboxes[folder.id] = cb;
+  _folderDescendantIds[folder.id] = collectDescendantIds(folder);
+
+  cb.addEventListener('change', () => {
+    if (!cb.checked) return;
+    _folderDescendantIds[folder.id].forEach(id => {
+      if (_folderCheckboxes[id]) _folderCheckboxes[id].checked = true;
+    });
+  });
+
+  const span = document.createElement('span');
+  span.textContent = `${depth > 0 ? '↳ ' : ''}${folder.name} (${folder.totalItemCount})`;
+  row.appendChild(cb);
+  row.appendChild(span);
+  container.appendChild(row);
+
+  (folder.children || []).forEach(child => renderFolderNode(child, depth + 1, container));
+}
+
+async function loadFolderList() {
+  const list = document.getElementById('folderList');
+  const copyBtn = document.getElementById('btnCopyExcludeFolders');
+  list.style.display = 'block';
+  list.textContent = TI18n.t('taskpane.diagFoldersLoading');
+  copyBtn.style.display = 'none';
+
+  try {
+    const res = await fetch(`${getServerUrl()}/api/graph/stats`, {
+      headers: { Authorization: `Bearer ${_token}` },
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    const data = await res.json();
+
+    list.innerHTML = '';
+    _folderCheckboxes = {};
+    _folderDescendantIds = {};
+    (data.folders || []).forEach(f => renderFolderNode(f, 0, list));
+    if (!(data.folders || []).length) list.textContent = TI18n.t('taskpane.diagNoFolders');
+
+    copyBtn.style.display = 'block';
+  } catch (e) {
+    list.textContent = TI18n.t('taskpane.diagFoldersError', { msg: e.message });
+  }
+}
+
+function copyExcludeFolders() {
+  const list = document.getElementById('folderList');
+  const out = document.getElementById('excludeFoldersOut');
+  const btn = document.getElementById('btnCopyExcludeFolders');
+
+  const ids = Array.from(list.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+  const query = ids.map(id => 'excludeFolderIds=' + encodeURIComponent(id)).join('&');
+
+  out.value = query;
+  out.style.display = 'block';
+  out.focus();
+  out.select();
+
+  navigator.clipboard?.writeText(query).then(() => {
+    const original = btn.textContent;
+    btn.textContent = TI18n.t('taskpane.tokenCopied');
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  }).catch(() => {});
+}
+
+// Nur fuers lokale Testen der Server-API (z.B. curl gegen /api/graph/*) — zeigt den vollen
+// Access-Token an, damit man ihn nicht muehsam per DevTools/Network-Tab suchen muss.
+function showToken() {
+  const btn = document.getElementById('btnCopyToken');
+  const out = document.getElementById('tokenOut');
+
+  if (!_token) {
+    out.value = TI18n.t('taskpane.diagNoToken');
+    out.style.display = 'block';
+    return;
+  }
+
+  out.value = _token;
+  out.style.display = 'block';
+  out.focus();
+  out.select();
+
+  // Best-effort — manche Office-WebViews verweigern die Clipboard-Permission stillschweigend,
+  // deshalb bleibt das selektierte Textarea (Strg+C) immer der zuverlaessige Fallback.
+  navigator.clipboard?.writeText(_token).then(() => {
+    const original = btn.textContent;
+    btn.textContent = TI18n.t('taskpane.tokenCopied');
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  }).catch(() => {});
 }
 
 const PERSONAL_DOMAINS = new Set([
@@ -873,6 +995,13 @@ function updateCompanyButton() {
 }
 
 // ── Contact Intelligence Detail Dialog ───────────────────────────────────
+// Dialoge liegen im selben Verzeichnis wie taskpane.html — Basis-URL vom eigenen Origin/Pfad
+// ableiten statt fest auf github.io zu verdrahten, sonst laden lokale Testbuilds (localhost)
+// trotzdem immer die deployte GitHub-Pages-Version (siehe Bug: Emails-Tab lokal unsichtbar).
+function dialogBaseUrl() {
+  return document.URL.slice(0, document.URL.lastIndexOf('/') + 1);
+}
+
 function openDetailDialog() {
   const contactName = document.getElementById('contactName')?.value?.trim();
   if (!contactName) { showStatus(TI18n.t('taskpane.contactSelectFirst'), 'error'); return; }
@@ -884,7 +1013,7 @@ function openDetailDialog() {
     name: contactName, email: _contactEmail || '', t: _token || '',
     srv: getServerUrl(), _v: '20260701a',
   });
-  const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/detail-open.html?${params.toString()}`;
+  const url    = `${dialogBaseUrl()}detail-open.html?${params.toString()}`;
 
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
@@ -895,11 +1024,25 @@ function openDetailDialog() {
   );
 }
 
+// Vorlaeufig: der Company-Tab hat noch keine eigene Ansicht, oeffnet stattdessen den
+// Knowledge-Graph-Dialog (siehe openGraphDialog) als Platzhalter-Einstiegspunkt.
+function openGraphDialog() {
+  const params = new URLSearchParams({ t: _token || '', srv: getServerUrl(), _v: '20260701x' });
+  const url    = `${dialogBaseUrl()}graph-open.html?${params.toString()}`;
+  Office.context.ui.displayDialogAsync(url, { height: 90, width: 80, promptBeforeOpen: false },
+    result => {
+      if (result.status === Office.AsyncResultStatus.Failed) {
+        showStatus(TI18n.t('taskpane.errOpenGraph'), 'error');
+      }
+    }
+  );
+}
+
 function openCompanyDialog() {
   const domain = (_contactEmail || '').split('@')[1]?.toLowerCase() || '';
   if (!domain) { showStatus(TI18n.t('taskpane.noCompanyDomain'), 'error'); return; }
   const params = new URLSearchParams({ domain, t: _token || '', srv: getServerUrl(), _v: '20260701a' });
-  const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/company-open.html?${params.toString()}`;
+  const url    = `${dialogBaseUrl()}company-open.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 85, width: 65, promptBeforeOpen: false },
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {
@@ -911,7 +1054,7 @@ function openCompanyDialog() {
 
 function openBatchDialog() {
   const params = new URLSearchParams({ t: _token || '', srv: getServerUrl(), _v: '20260701a' });
-  const url    = `https://gkaufmannzh.github.io/tembu-addin/outlook-addin/batch-open.html?${params.toString()}`;
+  const url    = `${dialogBaseUrl()}batch-open.html?${params.toString()}`;
   Office.context.ui.displayDialogAsync(url, { height: 90, width: 70, promptBeforeOpen: false },
     result => {
       if (result.status === Office.AsyncResultStatus.Failed) {
